@@ -5,6 +5,6 @@ import { HomePage } from '../pages/HomePage'
 
 export const router = createBrowserRouter([
   { path: '/', element: <HomePage /> },
-  { path: '/rooms/:roomId', element: <RoomPage /> },
-  { path: '/battle/:roomId', element: <BattlePage /> },
+  { path: '/rooms/:roomCode', element: <RoomPage /> },
+  { path: '/battle/:roomCode', element: <BattlePage /> },
 ])

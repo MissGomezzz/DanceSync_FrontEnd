@@ -1,40 +1,43 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
-import { useBattleStore } from '../store/battleStore'
+import { useRoom, useRoomError, useRoomStore } from '../../rooms/store/roomStore'
 import { BattleStageView } from './BattleStageView'
 
 interface BattleStageProps {
-  roomId: string
+  roomCode: string
 }
 
-export function BattleStage({ roomId }: BattleStageProps) {
+export function BattleStage({ roomCode }: BattleStageProps) {
   const navigate = useNavigate()
-  const status = useBattleStore((state) => state.status)
-  const scores = useBattleStore((state) => state.scores)
-  const setStatus = useBattleStore((state) => state.setStatus)
-  const reset = useBattleStore((state) => state.reset)
+  const room = useRoom()
+  const error = useRoomError()
+  const joinRoom = useRoomStore((state) => state.joinRoom)
+  const leaveRoom = useRoomStore((state) => state.leaveRoom)
 
-  const handleStart = () => {
-    // Real-time synchronization through Socket.IO will drive these transitions later.
-    setStatus('dancing')
+  useEffect(() => {
+    // Idempotent rejoin keeps the page working after a refresh mid-battle.
+    void joinRoom(roomCode)
+  }, [roomCode, joinRoom])
+
+  useEffect(() => {
+    if (room?.code === roomCode && room.status === 'waiting') {
+      navigate(`/rooms/${roomCode}`)
+    }
+  }, [room, roomCode, navigate])
+
+  const handleLeave = async () => {
+    await leaveRoom()
+    navigate('/')
   }
 
-  const handleFinish = () => {
-    setStatus('finished')
-  }
-
-  const handleBackToLobby = () => {
-    reset()
-    navigate(`/rooms/${roomId}`)
-  }
+  const inRoom = room?.code === roomCode
 
   return (
     <BattleStageView
-      roomId={roomId}
-      status={status}
-      scores={scores}
-      onStart={handleStart}
-      onFinish={handleFinish}
-      onBackToLobby={handleBackToLobby}
+      roomCode={roomCode}
+      room={inRoom ? room : null}
+      error={error}
+      onLeave={() => void handleLeave()}
     />
   )
 }

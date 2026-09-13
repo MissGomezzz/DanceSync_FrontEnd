@@ -1,24 +1,37 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { defaultGuestName, useAuthStore } from '../features/auth/store/authStore'
+import { useRoomError, useRoomStore } from '../features/rooms/store/roomStore'
 import { Button } from '../shared/ui/atoms/Button'
 import { Input } from '../shared/ui/atoms/Input'
 
-function generateRoomId() {
-  return Math.random().toString(36).slice(2, 8).toUpperCase()
-}
-
 export function HomePage() {
   const navigate = useNavigate()
-  const [joinCode, setJoinCode] = useState('')
+  const identity = useAuthStore((state) => state.identity)
+  const setDisplayName = useAuthStore((state) => state.setDisplayName)
+  const createRoom = useRoomStore((state) => state.createRoom)
+  const roomError = useRoomError()
 
-  const handleCreateRoom = () => {
-    // Room creation will call the rooms service; for now a local id is generated.
-    navigate(`/rooms/${generateRoomId()}`)
+  const [name, setName] = useState(() => identity?.displayName ?? defaultGuestName())
+  const [joinCode, setJoinCode] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  const handleCreateRoom = async () => {
+    setCreating(true)
+    try {
+      const room = await createRoom(name)
+      if (room) {
+        navigate(`/rooms/${room.code}`)
+      }
+    } finally {
+      setCreating(false)
+    }
   }
 
   const handleJoinRoom = () => {
     const code = joinCode.trim().toUpperCase()
     if (code.length === 0) return
+    setDisplayName(name)
     navigate(`/rooms/${code}`)
   }
 
@@ -33,7 +46,16 @@ export function HomePage() {
       </header>
 
       <div className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-6">
-        <Button onClick={handleCreateRoom}>Create room</Button>
+        <Input
+          id="display-name"
+          label="Display name"
+          placeholder="Your name"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <Button onClick={handleCreateRoom} disabled={creating || name.trim().length === 0}>
+          {creating ? 'Creating room...' : 'Create room'}
+        </Button>
         <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-slate-500">
           <span className="h-px flex-1 bg-slate-800" />
           or
@@ -44,11 +66,16 @@ export function HomePage() {
           label="Room code"
           placeholder="ABC123"
           value={joinCode}
-          onChange={(event) => setJoinCode(event.target.value)}
+          onChange={(event) => setJoinCode(event.target.value.toUpperCase())}
         />
-        <Button variant="secondary" onClick={handleJoinRoom} disabled={joinCode.trim().length === 0}>
+        <Button
+          variant="secondary"
+          onClick={handleJoinRoom}
+          disabled={joinCode.trim().length === 0 || name.trim().length === 0}
+        >
           Join room
         </Button>
+        {roomError && <p className="text-sm text-rose-400">{roomError}</p>}
       </div>
     </main>
   )

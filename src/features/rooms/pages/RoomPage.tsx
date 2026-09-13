@@ -2,15 +2,15 @@ import { Navigate, useParams } from 'react-router'
 import { RoomLobby } from '../components/RoomLobby'
 
 export function RoomPage() {
-  const { roomId } = useParams<{ roomId: string }>()
+  const { roomCode } = useParams<{ roomCode: string }>()
 
-  if (!roomId) {
+  if (!roomCode) {
     return <Navigate to="/" replace />
   }
 
   return (
     <main className="min-h-screen">
-      <RoomLobby roomId={roomId} />
+      <RoomLobby roomCode={roomCode.toUpperCase()} />
     </main>
   )
 }
