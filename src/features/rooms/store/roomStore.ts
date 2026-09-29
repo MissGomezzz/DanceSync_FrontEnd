@@ -6,7 +6,7 @@ import type { ChatMessage, DomainErrorPayload, Player, Room } from '../../../sha
 import { useAuthStore } from '../../auth/store/authStore'
 import { useChatStore } from '../../chat/store/chatStore'
 
-export const MAX_PLAYERS = 8
+export const MAX_PLAYERS = 7
 export const MIN_PLAYERS_TO_START = 2
 
 interface RoomState {
