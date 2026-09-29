@@ -36,12 +36,12 @@ export function HomePage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-10 p-6">
+    <main className="flex flex-1 flex-col items-center justify-center gap-10 p-6">
       <header className="text-center">
-        <h1 className="text-5xl font-extrabold tracking-tight text-fuchsia-400">DanceSync</h1>
+        <h1 className="text-5xl font-extrabold tracking-tight text-brand-red">DanceSync</h1>
         <p className="mt-3 max-w-md text-slate-400">
-          Join a room with up to 8 players. Two dancers battle in real time while spectators chat and rate the
-          performance.
+          Join a room with an odd number of players. Some dance to compete while everyone else spectates
+          and votes for the winner.
         </p>
       </header>
 
