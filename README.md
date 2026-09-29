@@ -25,6 +25,7 @@ src/
     auth/             authentication store and components (Azure Entra ID later)
     rooms/            lobby: create or join a room with up to 8 players
     battle/           real-time dance battle between the two dancers
+    camera/           camera permission, WebRTC peer session, and video tiles for the battle stage
     chat/             spectator chat
     rating/           spectators rate the dancers at the end of a battle
   shared/
@@ -57,6 +58,28 @@ Other scripts:
 
 During development, Vite proxies `/api` and `/socket.io` (including WebSocket upgrades) to the API gateway
 at `http://localhost:8080`.
+
+## Camera / WebRTC
+
+During a battle both dancers stream their camera and everyone in the room (the other dancer and up to six
+spectators) watches it live.
+
+- **Permission flow**: dancers first see an explanation in their stage tile; the browser permission prompt
+  only appears after they press "Enable camera". If the permission was granted earlier, the camera starts
+  directly.
+- **Video only**: no audio is captured, so the battle music does not echo between peers.
+- **Topology**: a full mesh of peer-to-peer connections. Dancers publish, spectators only receive, and
+  spectators never connect to each other. The dancer offers to each spectator; between the two dancers the
+  one with the lexicographically smaller player id offers and a single connection carries video both ways.
+- **Signaling**: offers, answers, and ICE candidates travel over Socket.IO (`webrtc:ready`,
+  `webrtc:peer-ready`, `webrtc:signal`) through battle-service, which only validates room membership and
+  relays them. Media never passes through the server.
+- **STUN only**: the MVP uses `stun:stun.l.google.com:19302` and no TURN server, so peers behind strict or
+  symmetric NATs (some corporate or mobile networks) may fail to connect.
+- **Secure context required**: browsers only expose the camera on `https://` pages or on `localhost`.
+  `http://localhost:5173` works, but opening the dev server from another machine through
+  `http://<LAN-IP>:5173` blocks the camera. For LAN tests serve the app over HTTPS, for example with
+  [`@vitejs/plugin-basic-ssl`](https://github.com/vitejs/vite-plugin-basic-ssl).
 
 ## Environment variables
 

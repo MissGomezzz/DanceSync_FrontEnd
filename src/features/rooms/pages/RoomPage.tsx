@@ -5,7 +5,7 @@ export function RoomPage() {
   const { roomCode } = useParams<{ roomCode: string }>()
 
   if (!roomCode) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/home" replace />
   }
 
   return (

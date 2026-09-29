@@ -6,9 +6,11 @@ import {
   MIN_PLAYERS_TO_START,
   useRoom,
   useRoomError,
+  useRoomJoinError,
   useRoomStore,
 } from '../store/roomStore'
 import { RoomLobbyView } from './RoomLobbyView'
+import { RoomUnavailableView } from './RoomUnavailableView'
 
 interface RoomLobbyProps {
   roomCode: string
@@ -18,6 +20,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const navigate = useNavigate()
   const room = useRoom()
   const error = useRoomError()
+  const joinError = useRoomJoinError()
   const joinRoom = useRoomStore((state) => state.joinRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const startBattle = useRoomStore((state) => state.startBattle)
@@ -36,10 +39,14 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
 
   const handleLeave = async () => {
     await leaveRoom()
-    navigate('/')
+    navigate('/home')
   }
 
   const inRoom = room?.code === roomCode
+  if (!inRoom && joinError) {
+    return <RoomUnavailableView roomCode={roomCode} reason={joinError} onBack={() => navigate('/home')} />
+  }
+
   const players = inRoom ? room.players : []
   const isHost = inRoom && myId !== undefined && room.hostId === myId
   const canStart = isHost && players.length >= MIN_PLAYERS_TO_START

@@ -12,7 +12,14 @@ export const MIN_PLAYERS_TO_START = 2
 interface RoomState {
   /** The server room, stored verbatim. */
   room: Room | null
+  /** Errors from actions inside a room (e.g. starting the battle). */
   error: string | null
+  /**
+   * Why the last join attempt failed (room missing, full, already battling).
+   * Kept apart from `error` so pages can render a dedicated "room unavailable"
+   * state instead of an empty lobby that looks like a brand new room.
+   */
+  joinError: string | null
   setRoom: (room: Room | null) => void
   setError: (error: string | null) => void
   clear: () => void
@@ -34,11 +41,12 @@ function toErrorMessage(error: unknown): string {
 export const useRoomStore = create<RoomState>((set, get) => ({
   room: null,
   error: null,
+  joinError: null,
   setRoom: (room) => set({ room }),
   setError: (error) => set({ error }),
   clear: () => {
     useChatStore.getState().clear()
-    set({ room: null, error: null })
+    set({ room: null, error: null, joinError: null })
   },
   createRoom: async (displayName) => {
     const identity = useAuthStore.getState().setDisplayName(displayName)
@@ -60,16 +68,17 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     if (get().room?.code !== code) {
       useChatStore.getState().clear()
     }
+    set({ joinError: null })
     try {
       const room = await emitWithAck<Room>('room:join', {
         roomCode: code,
         playerId: identity.id,
         displayName: identity.displayName,
       })
-      set({ room, error: null })
+      set({ room, error: null, joinError: null })
       return room
     } catch (error) {
-      set({ error: toErrorMessage(error) })
+      set({ joinError: toErrorMessage(error) })
       return null
     }
   },
@@ -116,10 +125,18 @@ export function initRoomSync(): void {
   socket.on('battle:finished', applyRoom)
   socket.on('chat:message', (message: ChatMessage) => useChatStore.getState().addMessage(message))
   socket.on('error:domain', (error: DomainErrorPayload) => useRoomStore.getState().setError(error.message))
+  // Socket.IO reconnects automatically after a network drop, but the new
+  // connection has no room membership on the server. Rejoin so the player
+  // keeps receiving room events (the server holds the seat for a grace period).
+  socket.io.on('reconnect', () => {
+    const { room, joinRoom } = useRoomStore.getState()
+    if (room) void joinRoom(room.code)
+  })
 }
 
 export const useRoom = () => useRoomStore((state) => state.room)
 export const useRoomError = () => useRoomStore((state) => state.error)
+export const useRoomJoinError = () => useRoomStore((state) => state.joinError)
 
 /**
  * Selectors derived from the room. They build a new array on every call, so

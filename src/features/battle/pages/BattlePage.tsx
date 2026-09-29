@@ -9,7 +9,7 @@ export function BattlePage() {
   const room = useRoom()
 
   if (!roomCode) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/home" replace />
   }
 
   const code = roomCode.toUpperCase()

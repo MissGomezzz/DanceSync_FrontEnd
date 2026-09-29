@@ -1,11 +1,18 @@
+import type { ReactNode } from 'react'
 import type { Player, Room, RoomStatus } from '../../../shared/types'
 import { Badge } from '../../../shared/ui/atoms/Badge'
 import { Button } from '../../../shared/ui/atoms/Button'
+import { VideoTile } from '../../camera/components/VideoTile'
+import type { DancerVideo } from '../../camera/hooks/useBattleVideo'
 
 interface BattleStageViewProps {
   roomCode: string
   room: Room | null
   error: string | null
+  /** One camera tile per dancer; empty before the battle starts. */
+  dancerVideos: DancerVideo[]
+  /** Shown in the local dancer's tile until the camera is on; null otherwise. */
+  cameraPrompt: ReactNode
   onLeave: () => void
 }
 
@@ -15,7 +22,7 @@ const statusLabels: Record<RoomStatus, string> = {
   finished: 'Battle finished',
 }
 
-export function BattleStageView({ roomCode, room, error, onLeave }: BattleStageViewProps) {
+export function BattleStageView({ roomCode, room, error, dancerVideos, cameraPrompt, onLeave }: BattleStageViewProps) {
   const dancers = room?.dancers ?? null
   const result = room?.battle?.result ?? null
 
@@ -31,15 +38,26 @@ export function BattleStageView({ roomCode, room, error, onLeave }: BattleStageV
       {error && <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {dancers ? (
-          dancers.map((dancer) => <DancerSlot key={dancer.id} dancer={dancer} />)
+        {dancerVideos.length > 0 ? (
+          dancerVideos.map(({ dancer, isMe, stream, placeholder }) => (
+            <VideoTile
+              key={dancer.id}
+              label={dancer.displayName}
+              stream={stream}
+              mirrored={isMe}
+              placeholder={placeholder}
+              badges={
+                <>
+                  {isMe && <Badge tone="success">you</Badge>}
+                  <Badge tone="accent">dancer</Badge>
+                </>
+              }
+              overlay={isMe ? cameraPrompt : null}
+            />
+          ))
         ) : (
           <p className="text-sm text-slate-500 sm:col-span-2">Waiting for the battle to start.</p>
         )}
-      </div>
-
-      <div className="flex min-h-64 items-center justify-center rounded-xl border border-dashed border-slate-700 bg-slate-900/60 text-slate-500">
-        Dance stage placeholder
       </div>
 
       {room?.status === 'finished' && <ResultPanel dancers={dancers} result={result} />}
@@ -50,15 +68,6 @@ export function BattleStageView({ roomCode, room, error, onLeave }: BattleStageV
         </Button>
       </footer>
     </section>
-  )
-}
-
-function DancerSlot({ dancer }: { dancer: Player }) {
-  return (
-    <div className="flex items-center justify-between rounded-xl border border-fuchsia-900/60 bg-slate-900 px-4 py-4">
-      <span className="text-lg font-semibold text-slate-100">{dancer.displayName}</span>
-      <Badge tone="accent">dancer</Badge>
-    </div>
   )
 }
 
