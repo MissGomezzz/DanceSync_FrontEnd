@@ -43,6 +43,7 @@ interface AuthState {
   ensureIdentity: () => GuestIdentity
   /** Updates the display name (keeping the player id) and returns the identity. */
   setDisplayName: (displayName: string) => GuestIdentity
+  login: (username: string) => GuestIdentity
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -59,6 +60,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const base = get().identity ?? { id: crypto.randomUUID(), displayName: defaultGuestName() }
     const trimmed = displayName.trim()
     const identity: GuestIdentity = { ...base, displayName: trimmed.length > 0 ? trimmed : base.displayName }
+    persistIdentity(identity)
+    set({ identity })
+    return identity
+  },
+    login: (username) => {
+    // Mocked for the MVP: no real backend check yet, password is intentionally ignored here.
+    const trimmed = username.trim()
+    const identity: GuestIdentity = {
+      id: crypto.randomUUID(),
+      displayName: trimmed.length > 0 ? trimmed : defaultGuestName(),
+    }
     persistIdentity(identity)
     set({ identity })
     return identity
