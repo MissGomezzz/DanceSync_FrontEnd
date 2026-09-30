@@ -3,7 +3,7 @@
  * Dates travel as ISO strings over JSON, so every timestamp is typed as string.
  */
 
-export type PlayerRole = 'dancer' | 'spectator'
+export type PlayerRole = 'undecided' | 'dancer' | 'spectator'
 
 export type RoomStatus = 'waiting' | 'battling' | 'finished'
 
@@ -31,7 +31,7 @@ export interface BattleResult {
 export interface Battle {
   id: string
   roomCode: string
-  dancerIds: [string, string]
+  dancerIds: string[]
   ratings: Rating[]
   startedAt: string
   finishedAt: string | null
@@ -42,7 +42,7 @@ export interface Room {
   code: string
   hostId: string
   players: Player[]
-  dancers: [Player, Player] | null
+  dancers: Player[] | null
   spectators: Player[]
   status: RoomStatus
   battle: Battle | null

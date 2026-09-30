@@ -72,7 +72,7 @@ export function BattleStageView({ roomCode, room, error, dancerVideos, cameraPro
 }
 
 interface ResultPanelProps {
-  dancers: [Player, Player] | null
+  dancers: Player[] | null
   result: { scores: Record<string, number>; winnerId: string | null } | null
 }
 
