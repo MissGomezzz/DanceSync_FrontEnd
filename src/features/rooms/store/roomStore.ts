@@ -6,29 +6,20 @@ import type { ChatMessage, DomainErrorPayload, Player, Room } from '../../../sha
 import { useAuthStore } from '../../auth/store/authStore'
 import { useChatStore } from '../../chat/store/chatStore'
 
-export const MAX_PLAYERS = 8
+export const MAX_PLAYERS = 7
 export const MIN_PLAYERS_TO_START = 2
 
 interface RoomState {
-  /** The server room, stored verbatim. */
   room: Room | null
-  /** Errors from actions inside a room (e.g. starting the battle). */
   error: string | null
-  /**
-   * Why the last join attempt failed (room missing, full, already battling).
-   * Kept apart from `error` so pages can render a dedicated "room unavailable"
-   * state instead of an empty lobby that looks like a brand new room.
-   */
   joinError: string | null
   setRoom: (room: Room | null) => void
   setError: (error: string | null) => void
   clear: () => void
-  /** Creates a room over HTTP, then joins it through the socket. Null on failure. */
   createRoom: (displayName: string) => Promise<Room | null>
-  /** Joins (or idempotently rejoins) a room through the socket. Null on failure. */
   joinRoom: (roomCode: string) => Promise<Room | null>
   leaveRoom: () => Promise<void>
-  /** Asks the server to start the battle; domain errors land in `error`. */
+  selectRole: (role: 'dancer' | 'spectator') => Promise<void>
   startBattle: () => Promise<void>
 }
 
@@ -94,6 +85,21 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
     get().clear()
   },
+  selectRole: async (role) => {
+    const { room } = get()
+    const identity = useAuthStore.getState().identity
+    if (!room || !identity) return
+    try {
+      const updated = await emitWithAck<Room>('role:select', {
+        roomCode: room.code,
+        playerId: identity.id,
+        role,
+      })
+      set({ room: updated, error: null })
+    } catch (error) {
+      set({ error: toErrorMessage(error) })
+    }
+  },
   startBattle: async () => {
     const { room } = get()
     const identity = useAuthStore.getState().identity
@@ -112,10 +118,6 @@ export const useRoomStore = create<RoomState>((set, get) => ({
 
 let listenersBound = false
 
-/**
- * Binds the server-to-client listeners exactly once for the app lifetime.
- * Called from every join flow so it is guaranteed to run before any event lands.
- */
 export function initRoomSync(): void {
   if (listenersBound) return
   listenersBound = true
@@ -125,9 +127,6 @@ export function initRoomSync(): void {
   socket.on('battle:finished', applyRoom)
   socket.on('chat:message', (message: ChatMessage) => useChatStore.getState().addMessage(message))
   socket.on('error:domain', (error: DomainErrorPayload) => useRoomStore.getState().setError(error.message))
-  // Socket.IO reconnects automatically after a network drop, but the new
-  // connection has no room membership on the server. Rejoin so the player
-  // keeps receiving room events (the server holds the seat for a grace period).
   socket.io.on('reconnect', () => {
     const { room, joinRoom } = useRoomStore.getState()
     if (room) void joinRoom(room.code)
@@ -138,11 +137,6 @@ export const useRoom = () => useRoomStore((state) => state.room)
 export const useRoomError = () => useRoomStore((state) => state.error)
 export const useRoomJoinError = () => useRoomStore((state) => state.joinError)
 
-/**
- * Selectors derived from the room. They build a new array on every call, so
- * components must consume them through the shallow-compared hooks below to
- * avoid infinite re-renders.
- */
 const selectPlayers = (state: RoomState): Player[] => state.room?.players ?? []
 const selectDancers = (state: RoomState): Player[] => state.room?.dancers ?? []
 const selectSpectators = (state: RoomState): Player[] => state.room?.spectators ?? []
