@@ -28,6 +28,8 @@ src/
     camera/           camera permission, WebRTC peer session, and video tiles for the battle stage
     chat/             spectator chat
     rating/           spectators rate the dancers at the end of a battle
+    songSelection/    lobby typing challenge that decides who picks the song
+    wordRace/         mid-battle word race overlay (first dancer to type the word wins the round)
   shared/
     ui/atoms/         smallest reusable UI pieces (Button, Input, Badge)
     ui/molecules/     compositions of atoms (PlayerCard)
@@ -80,6 +82,20 @@ spectators) watches it live.
   `http://localhost:5173` works, but opening the dev server from another machine through
   `http://<LAN-IP>:5173` blocks the camera. For LAN tests serve the app over HTTPS, for example with
   [`@vitejs/plugin-basic-ssl`](https://github.com/vitejs/vite-plugin-basic-ssl).
+
+## Word race
+
+At random moments of the battle a word appears over the dance stage (`features/wordRace`) and the dancers
+race to type it. battle-service decides the winner atomically; the UI only renders what it is told.
+
+- `useWordRaceSync` (mounted by `BattleStage`) binds `word:round-started` / `word:round-ended`, ignores
+  events of other rooms and unbinds on unmount, so StrictMode double mounts are safe.
+- The countdown uses the server's relative `expiresInMs` against `performance.now()`, never the wall clock.
+- Dancers get an autofocused input (Enter submits, pasting is blocked as a light anti-cheat) and can retry
+  after a typo ("Not quite, try again"). Spectators see the word and the countdown only.
+- When the round ends everyone sees a banner for 3.5 s: the winner, "Too slow!" or "You typed it, but ...
+  got there first" for the other dancers, the winner's name for spectators, or "Time's up!". Each dancer
+  tile shows how many words that dancer has won.
 
 ## Environment variables
 

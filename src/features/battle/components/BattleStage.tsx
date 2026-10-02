@@ -4,6 +4,9 @@ import { CameraPermissionPrompt } from '../../camera/components/CameraPermission
 import { useBattleVideo } from '../../camera/hooks/useBattleVideo'
 import { RoomUnavailableView } from '../../rooms/components/RoomUnavailableView'
 import { useRoom, useRoomError, useRoomJoinError, useRoomStore } from '../../rooms/store/roomStore'
+import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
+import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
+import { useWordRaceWins } from '../../wordRace/store/wordRaceStore'
 import { BattleStageView } from './BattleStageView'
 
 interface BattleStageProps {
@@ -18,6 +21,9 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const joinRoom = useRoomStore((state) => state.joinRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const { dancerVideos, needsCameraPrompt } = useBattleVideo(roomCode)
+  const wordWins = useWordRaceWins()
+  // Bound before the (re)join below, so a word already on screen is not missed.
+  useWordRaceSync(roomCode)
 
   useEffect(() => {
     // Idempotent rejoin keeps the page working after a refresh mid-battle.
@@ -47,6 +53,8 @@ export function BattleStage({ roomCode }: BattleStageProps) {
       error={error}
       dancerVideos={dancerVideos}
       cameraPrompt={needsCameraPrompt ? <CameraPermissionPrompt /> : null}
+      wordRace={<WordRaceOverlay />}
+      wordWins={wordWins}
       onLeave={() => void handleLeave()}
     />
   )

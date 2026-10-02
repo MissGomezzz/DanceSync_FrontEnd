@@ -13,6 +13,10 @@ interface BattleStageViewProps {
   dancerVideos: DancerVideo[]
   /** Shown in the local dancer's tile until the camera is on; null otherwise. */
   cameraPrompt: ReactNode
+  /** Word race overlay drawn on top of the dancer tiles. */
+  wordRace: ReactNode
+  /** Word race rounds won per dancer id; a dancer without an entry shows no tally. */
+  wordWins: Record<string, number>
   onLeave: () => void
 }
 
@@ -22,7 +26,16 @@ const statusLabels: Record<RoomStatus, string> = {
   finished: 'Battle finished',
 }
 
-export function BattleStageView({ roomCode, room, error, dancerVideos, cameraPrompt, onLeave }: BattleStageViewProps) {
+export function BattleStageView({
+  roomCode,
+  room,
+  error,
+  dancerVideos,
+  cameraPrompt,
+  wordRace,
+  wordWins,
+  onLeave,
+}: BattleStageViewProps) {
   const dancers = room?.dancers ?? null
   const result = room?.battle?.result ?? null
 
@@ -43,7 +56,8 @@ export function BattleStageView({ roomCode, room, error, dancerVideos, cameraPro
 
       {error &&<p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="relative grid gap-4 sm:grid-cols-2">
+        {wordRace}
         {dancerVideos.length > 0 ? (
           dancerVideos.map(({ dancer, isMe, stream, placeholder }) => (
             <VideoTile
@@ -55,6 +69,11 @@ export function BattleStageView({ roomCode, room, error, dancerVideos, cameraPro
               badges={
                 <>
                   {isMe && <Badge tone="success">you</Badge>}
+                  {wordWins[dancer.id] !== undefined && (
+                    <Badge>
+                      {wordWins[dancer.id]} {wordWins[dancer.id] === 1 ? 'word' : 'words'}
+                    </Badge>
+                  )}
                   <Badge tone="accent">dancer</Badge>
                 </>
               }
