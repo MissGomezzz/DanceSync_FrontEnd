@@ -44,7 +44,8 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
 
   useEffect(() => {
     if (room?.code === roomCode && room.status !== 'waiting') {
-      navigate(`/battle/${roomCode}`)
+      // Replace: Back from the battle must not land on a lobby that bounces forward again.
+      navigate(`/battle/${roomCode}`, { replace: true })
     }
   }, [room, roomCode, navigate])
 

@@ -64,12 +64,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ identity })
     return identity
   },
-    login: (username) => {
+  login: (username) => {
     // Mocked for the MVP: no real backend check yet, password is intentionally ignored here.
+    // The player id is kept when one exists: minting a new one would orphan any seat
+    // this tab still holds in a room under the old id.
     const trimmed = username.trim()
+    const existing = get().identity
     const identity: GuestIdentity = {
-      id: crypto.randomUUID(),
-      displayName: trimmed.length > 0 ? trimmed : defaultGuestName(),
+      id: existing?.id ?? crypto.randomUUID(),
+      displayName: trimmed.length > 0 ? trimmed : (existing?.displayName ?? defaultGuestName()),
     }
     persistIdentity(identity)
     set({ identity })

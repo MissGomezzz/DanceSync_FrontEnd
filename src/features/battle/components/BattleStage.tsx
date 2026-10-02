@@ -35,7 +35,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
 
   useEffect(() => {
     if (room?.code === roomCode && room.status === 'waiting') {
-      navigate(`/rooms/${roomCode}`)
+      navigate(`/rooms/${roomCode}`, { replace: true })
     }
   }, [room, roomCode, navigate])
 
