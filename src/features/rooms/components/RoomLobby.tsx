@@ -7,9 +7,11 @@ import {
   MIN_PLAYERS_TO_START,
   useRoom,
   useRoomError,
+  useRoomJoinError,
   useRoomStore,
 } from '../store/roomStore'
 import { RoleSelector } from './RoleSelector'
+import { RoomUnavailableView } from './RoomUnavailableView'
 import { RoomLobbyView } from './RoomLobbyView'
 
 interface RoomLobbyProps {
@@ -20,6 +22,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const navigate = useNavigate()
   const room = useRoom()
   const error = useRoomError()
+  const joinError = useRoomJoinError()
   const joinRoom = useRoomStore((state) => state.joinRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const startBattle = useRoomStore((state) => state.startBattle)
@@ -41,25 +44,13 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
 
   const handleLeave = async () => {
     await leaveRoom()
-    navigate('/')
+    navigate('/home')
   }
 
   const inRoom = room?.code === roomCode
 
-  if (!joining && !inRoom && error) {
-    return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="text-lg font-semibold text-rose-400">{error}</p>
-        <p className="text-sm text-slate-500">Room code "{roomCode}" doesn't exist or is no longer open.</p>
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="rounded-lg bg-brand-red px-4 py-2 text-sm font-semibold text-white hover:bg-brand-red-light"
-        >
-          Back to home
-        </button>
-      </main>
-    )
+  if (!joining && !inRoom && joinError) {
+    return <RoomUnavailableView roomCode={roomCode} reason={joinError} onBack={() => navigate('/home')} />
   }
 
   const players = inRoom ? room.players : []
