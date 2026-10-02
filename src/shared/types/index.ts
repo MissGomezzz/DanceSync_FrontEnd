@@ -66,8 +66,13 @@ export type SongSubmitOutcome = 'accepted' | 'incorrect' | 'expired'
 export interface Battle {
   id: string
   roomCode: string
+  /**
+   * Dancers still in the battle. A dancer who leaves is removed: with two or more
+   * left the battle goes on, otherwise it finishes early with `result: null`.
+   */
   dancerIds: string[]
   song: Song | null
+  /** Every rating submitted, including those for a dancer who left (excluded from the result). */
   ratings: Rating[]
   startedAt: string
   finishedAt: string | null
