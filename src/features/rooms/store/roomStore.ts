@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
 import { httpClient } from '../../../shared/api/httpClient'
 import { emitWithAck, socket, SocketDomainError } from '../../../shared/lib/socket'
-import type { ChatMessage, DomainErrorPayload, Player, Room } from '../../../shared/types'
+import type { ChatMessage, DomainErrorPayload, Player, Room, SongSubmitOutcome } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useChatStore } from '../../chat/store/chatStore'
 
@@ -21,6 +21,10 @@ interface RoomState {
   leaveRoom: () => Promise<void>
   selectRole: (role: 'dancer' | 'spectator') => Promise<void>
   startBattle: () => Promise<void>
+  startSongChallenge: () => Promise<void>
+  /** Returns the server verdict, or null when the submission could not be processed. */
+  submitSongPhrase: (text: string) => Promise<SongSubmitOutcome | null>
+  chooseSong: (songId: string) => Promise<void>
 }
 
 function toErrorMessage(error: unknown): string {
@@ -108,6 +112,52 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       const updated = await emitWithAck<Room>('battle:start', {
         roomCode: room.code,
         requesterId: identity.id,
+      })
+      set({ room: updated, error: null })
+    } catch (error) {
+      set({ error: toErrorMessage(error) })
+    }
+  },
+  startSongChallenge: async () => {
+    const { room } = get()
+    const identity = useAuthStore.getState().identity
+    if (!room || !identity) return
+    try {
+      const updated = await emitWithAck<Room>('song-challenge:start', {
+        roomCode: room.code,
+        requesterId: identity.id,
+      })
+      set({ room: updated, error: null })
+    } catch (error) {
+      set({ error: toErrorMessage(error) })
+    }
+  },
+  submitSongPhrase: async (text) => {
+    const { room } = get()
+    const identity = useAuthStore.getState().identity
+    if (!room || !identity) return null
+    try {
+      const result = await emitWithAck<{ room: Room; outcome: SongSubmitOutcome }>('song-challenge:submit', {
+        roomCode: room.code,
+        playerId: identity.id,
+        text,
+      })
+      set({ room: result.room, error: null })
+      return result.outcome
+    } catch (error) {
+      set({ error: toErrorMessage(error) })
+      return null
+    }
+  },
+  chooseSong: async (songId) => {
+    const { room } = get()
+    const identity = useAuthStore.getState().identity
+    if (!room || !identity) return
+    try {
+      const updated = await emitWithAck<Room>('song:choose', {
+        roomCode: room.code,
+        playerId: identity.id,
+        songId,
       })
       set({ room: updated, error: null })
     } catch (error) {

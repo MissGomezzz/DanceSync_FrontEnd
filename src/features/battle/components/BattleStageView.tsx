@@ -35,7 +35,13 @@ export function BattleStageView({ roomCode, room, error, dancerVideos, cameraPro
         )}
       </header>
 
-      {error && <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
+      {room?.battle?.song && (
+        <p className="text-sm text-slate-400">
+          Song: <span className="font-semibold text-slate-100">{room.battle.song.title}</span> by {room.battle.song.artist}
+        </p>
+      )}
+
+      {error &&<p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {dancerVideos.length > 0 ? (

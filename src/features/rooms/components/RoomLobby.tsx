@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuthStore } from '../../auth/store/authStore'
+import { SongSelectionPanel } from '../../songSelection/components/SongSelectionPanel'
 import {
   MAX_PLAYERS,
   MIN_PLAYERS_TO_START,
@@ -65,10 +66,16 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const me = players.find((p) => p.id === myId)
   const dancerCount = players.filter((p) => p.role === 'dancer').length
   const isHost = inRoom && myId !== undefined && room.hostId === myId
-  const canStart = isHost && dancerCount >= MIN_PLAYERS_TO_START
-  const startHint = isHost && dancerCount < MIN_PLAYERS_TO_START
-    ? `At least ${MIN_PLAYERS_TO_START} players must choose "Dance" to start.`
-    : null
+  const songPhase = inRoom ? room.songSelection?.phase : undefined
+  const choosingSong = songPhase === 'typing' || songPhase === 'choosing'
+  const canStart = isHost && dancerCount >= MIN_PLAYERS_TO_START && !choosingSong
+  const startHint = !isHost
+    ? null
+    : dancerCount < MIN_PLAYERS_TO_START
+      ? `At least ${MIN_PLAYERS_TO_START} players must choose "Dance" to start.`
+      : choosingSong
+        ? 'Wait until the song has been chosen.'
+        : null
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -79,6 +86,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
           onSelectSpectator={() => void selectRole('spectator')}
         />
       )}
+      {inRoom && <SongSelectionPanel room={room} />}
       <RoomLobbyView
         roomCode={roomCode}
         players={players}
