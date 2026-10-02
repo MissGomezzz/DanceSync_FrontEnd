@@ -207,3 +207,47 @@ describe('submission feedback and in-flight guards', () => {
     expect(screen.getByRole('button', { name: /Dance Monkey/ })).toHaveProperty('disabled', true)
   })
 })
+
+describe('server-relative countdowns', () => {
+  it('counts down from expiresInMs and ignores a skewed absolute expiresAt', () => {
+    // The browser clock runs a minute ahead: expiresAt already looks expired locally.
+    const skewed = selection({
+      challenge: { id: 'c1', phrase: PHRASE, startedAt: NOW.toISOString(), expiresAt: new Date(NOW.getTime() - 45_000).toISOString(), expiresInMs: 15_000 },
+    })
+    renderAs('me', room(skewed))
+    expect(screen.getByRole('timer').textContent).toBe('15s')
+    expect(screen.getByRole('textbox')).toHaveProperty('disabled', false)
+
+    act(() => vi.advanceTimersByTime(5_000))
+    expect(screen.getByRole('timer').textContent).toBe('10s')
+  })
+
+  it('recomputes the deadline from every new room payload', () => {
+    const first = selection({ challenge: { ...selection().challenge, expiresInMs: 15_000 } })
+    const { rerender } = renderAs('me', room(first))
+    expect(screen.getByRole('timer').textContent).toBe('15s')
+
+    const later = selection({ challenge: { ...selection().challenge, expiresInMs: 4_000 } })
+    rerender(<SongSelectionPanel room={room(later)} />)
+    expect(screen.getByRole('timer').textContent).toBe('4s')
+  })
+
+  it('shows everyone how long the chooser has left', () => {
+    renderAs('rival', room(selection({ phase: 'choosing', chooserId: 'me', chooserReason: 'typed', chooseExpiresInMs: 12_000 })))
+    expect(screen.getByText('Me is choosing the song — 12s')).toBeTruthy()
+
+    act(() => vi.advanceTimersByTime(3_000))
+    expect(screen.getByText('Me is choosing the song — 9s')).toBeTruthy()
+  })
+
+  it('warns the chooser that a random song is picked when time runs out', () => {
+    renderAs('me', room(selection({ phase: 'choosing', chooserId: 'me', chooserReason: 'typed', chooseExpiresInMs: 12_000 })))
+    expect(screen.getByRole('timer', { name: 'Time left to choose' }).textContent).toMatch(/12s or a random song/)
+  })
+
+  it('explains when the server picked the song because time ran out', () => {
+    const picked = { ...room(selection({ phase: 'done', chooserId: 'rival', autoPicked: true })), selectedSong: selection().songOptions[1] }
+    renderAs('me', picked)
+    expect(screen.getByText('Time ran out, a random song was picked.')).toBeTruthy()
+  })
+})

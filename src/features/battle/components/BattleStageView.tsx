@@ -110,7 +110,7 @@ function ResultPanel({ dancers, result }: ResultPanelProps) {
   if (!result || !dancers) {
     return (
       <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-4 text-sm text-slate-400">
-        The battle ended early, so there is no result.
+        The battle ended without a rating result.
       </div>
     )
   }

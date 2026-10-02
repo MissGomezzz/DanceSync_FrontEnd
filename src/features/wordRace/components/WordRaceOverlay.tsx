@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useRoomStore } from '../../rooms/store/roomStore'
-import { useRoundCountdown } from '../hooks/useRoundCountdown'
+import { useCountdown } from '../../../shared/hooks/useCountdown'
 import {
   useActiveWordRound,
   useWordRaceAttempt,
@@ -37,7 +37,7 @@ function WordRaceOverlayContent({ round, result }: WordRaceOverlayContentProps) 
   const { submitting, lastAttempt } = useWordRaceAttempt()
   const submitWord = useWordRaceStore((state) => state.submitWord)
   const clearAttempt = useWordRaceStore((state) => state.clearAttempt)
-  const remainingMs = useRoundCountdown(round?.deadline ?? null)
+  const remainingMs = useCountdown(round?.deadline ?? null)
   const [typed, setTyped] = useState('')
 
   const handleTypedChange = (value: string) => {

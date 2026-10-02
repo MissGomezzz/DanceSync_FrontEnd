@@ -3,9 +3,9 @@ import type { Room, SongSelection, SongSubmitOutcome } from '../../../shared/typ
 import { Button } from '../../../shared/ui/atoms/Button'
 import { useAuthStore } from '../../auth/store/authStore'
 import { MIN_PLAYERS_TO_START, useRoomStore } from '../../rooms/store/roomStore'
-import { useCountdown } from '../hooks/useCountdown'
+import { useCountdown, useServerDeadline } from '../../../shared/hooks/useCountdown'
 import { SongChallengeView } from './SongChallengeView'
-import { SongPickerView } from './SongPickerView'
+import { SongPickerView, type SongPickerViewProps } from './SongPickerView'
 
 interface SongSelectionPanelProps {
   room: Room
@@ -51,7 +51,8 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
   if (selection?.phase === 'choosing') {
     const chooser = room.players.find((p) => p.id === selection.chooserId)
     return (
-      <SongPickerView
+      <SongPicker
+        selection={selection}
         songs={selection.songOptions}
         chooserName={chooser?.displayName ?? 'Another player'}
         chooserReason={selection.chooserReason}
@@ -73,10 +74,15 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
     >
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Song</h2>
       {room.selectedSong ? (
-        <p className="text-lg">
-          <span className="font-semibold">{room.selectedSong.title}</span>{' '}
-          <span className="text-slate-400">by {room.selectedSong.artist}</span>
-        </p>
+        <>
+          <p className="text-lg">
+            <span className="font-semibold">{room.selectedSong.title}</span>{' '}
+            <span className="text-slate-400">by {room.selectedSong.artist}</span>
+          </p>
+          {selection?.autoPicked && (
+            <p className="text-sm text-slate-400">Time ran out, a random song was picked.</p>
+          )}
+        </>
       ) : (
         <p className="text-sm text-slate-400">No song chosen yet. Win the typing challenge to pick it.</p>
       )}
@@ -107,7 +113,10 @@ function SongChallenge({ selection, myId }: SongChallengeProps) {
   const [submitting, setSubmitting] = useState(false)
   const [outcome, setOutcome] = useState<SongSubmitOutcome | null>(null)
   const { challenge } = selection
-  const remainingMs = useCountdown(challenge.expiresAt)
+  // Relative to this payload's arrival, so a skewed browser clock does not matter.
+  const deadline = useServerDeadline(challenge.expiresInMs, selection, challenge.expiresAt)
+  const remainingMs = useCountdown(deadline)
+  // Window length for the progress bar; both dates come from the server clock.
   const totalMs = Date.parse(challenge.expiresAt) - Date.parse(challenge.startedAt)
 
   const isParticipant = myId !== undefined && selection.participantIds.includes(myId)
@@ -147,4 +156,15 @@ function SongChallenge({ selection, myId }: SongChallengeProps) {
       onSubmit={() => void handleSubmit()}
     />
   )
+}
+
+type SongPickerProps = Omit<SongPickerViewProps, 'remainingMs'> & {
+  selection: SongSelection
+}
+
+/** Adds the server's pick deadline (when it sends one) to the song picker. */
+function SongPicker({ selection, ...viewProps }: SongPickerProps) {
+  const deadline = useServerDeadline(selection.chooseExpiresInMs ?? null, selection)
+  const remainingMs = useCountdown(deadline)
+  return <SongPickerView {...viewProps} remainingMs={deadline === null ? null : remainingMs} />
 }

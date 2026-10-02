@@ -45,7 +45,13 @@ export interface SongChallenge {
   id: string
   phrase: string
   startedAt: string
+  /** Absolute end of the typing window; only a fallback, it depends on clocks agreeing. */
   expiresAt: string
+  /**
+   * Time left in the typing window when the server emitted this room. Preferred
+   * over `expiresAt` (no clock skew); optional until every server sends it.
+   */
+  expiresInMs?: number
 }
 
 export interface SongSelection {
@@ -58,6 +64,14 @@ export interface SongSelection {
   chooserId: string | null
   chooserReason: ChooserReason | null
   songOptions: Song[]
+  /**
+   * Time left for the chooser to pick a song while the phase is "choosing", when
+   * the server emitted this room; at zero the server picks a random song.
+   * Null outside that phase; absent on servers that predate the pick deadline.
+   */
+  chooseExpiresInMs?: number | null
+  /** True when the server picked the song because the chooser ran out of time. */
+  autoPicked?: boolean
 }
 
 /** Server verdict on a typed phrase. */
@@ -76,6 +90,10 @@ export interface Battle {
   ratings: Rating[]
   startedAt: string
   finishedAt: string | null
+  /**
+   * Null when the battle finished without a rating result: too few dancers left,
+   * or the song ended before the ratings were in.
+   */
   result: BattleResult | null
 }
 
@@ -90,6 +108,8 @@ export interface Room {
   songSelection: SongSelection | null
   selectedSong: Song | null
   createdAt: string
+  /** Server-side optimistic concurrency counter; not used by the UI. */
+  version?: number
 }
 
 export interface ChatMessage {
@@ -102,6 +122,7 @@ export interface ChatMessage {
 }
 
 export interface DomainErrorPayload {
+  /** For example ROOM_NOT_FOUND, ROOM_NOT_WAITING, INVALID_PLAYER (bad join input) or TIMEOUT (client-side). */
   code: string
   message: string
 }
