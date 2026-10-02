@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useShallow } from 'zustand/react/shallow'
 
 /**
  * UI-facing view of the WebRTC mesh. The RTCPeerConnections themselves live in
@@ -35,9 +36,13 @@ export const usePeerStore = create<PeerState>((set) => ({
   reset: () => set({ remoteStreams: {}, connectionStates: {} }),
 }))
 
-// These selectors return values already held in the state (never a freshly built
-// object), so they are referentially stable and do not need useShallow.
-export const useRemoteStream = (playerId: string | undefined) =>
-  usePeerStore((state) => (playerId ? (state.remoteStreams[playerId] ?? null) : null))
-export const usePeerConnectionState = (playerId: string | undefined) =>
-  usePeerStore((state) => (playerId ? (state.connectionStates[playerId] ?? null) : null))
+// These selectors build a fresh array on every call, so they go through
+// useShallow: the component re-renders only when one of the entries changes.
+
+/** Remote stream of each requested player, in the same order; null until it arrives. */
+export const useRemoteStreams = (playerIds: readonly string[]) =>
+  usePeerStore(useShallow((state) => playerIds.map((id) => state.remoteStreams[id] ?? null)))
+
+/** Connection state with each requested player, in the same order; null when there is none. */
+export const usePeerConnectionStates = (playerIds: readonly string[]) =>
+  usePeerStore(useShallow((state) => playerIds.map((id) => state.connectionStates[id] ?? null)))

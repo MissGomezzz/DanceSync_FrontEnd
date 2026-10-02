@@ -4,7 +4,7 @@ import { useAuthStore } from '../../auth/store/authStore'
 import { useRoom, useRoomStore } from '../../rooms/store/roomStore'
 import { createPeerSession } from '../lib/peerSession'
 import { useCameraStatus, useCameraStore, useLocalStream } from '../store/cameraStore'
-import { usePeerConnectionState, useRemoteStream } from '../store/peerStore'
+import { usePeerConnectionStates, useRemoteStreams } from '../store/peerStore'
 
 export interface DancerVideo {
   dancer: Player
@@ -65,27 +65,27 @@ export function useBattleVideo(roomCode: string): BattleVideo {
     return () => session.dispose()
   }, [active, isDancer, myId, roomCode, publishedStream])
 
-  const [first, second] = dancers ?? []
-  const firstStream = useRemoteStream(first?.id)
-  const secondStream = useRemoteStream(second?.id)
-  const firstState = usePeerConnectionState(first?.id)
-  const secondState = usePeerConnectionState(second?.id)
+  // The server allows any number of dancers (at least two), and the peer session
+  // already meshes every dancer pair, so there is one tile per dancer.
+  const dancerList = dancers ?? []
+  const dancerIds = dancerList.map((d) => d.id)
+  const remoteStreams = useRemoteStreams(dancerIds)
+  const connectionStates = usePeerConnectionStates(dancerIds)
 
   const waitingForMyCamera = isDancer && !publishedStream
-  const toVideo = (dancer: Player, remote: MediaStream | null, state: RTCPeerConnectionState | null): DancerVideo => {
+  const toVideo = (dancer: Player, index: number): DancerVideo => {
     const isMe = dancer.id === myId
     return {
       dancer,
       isMe,
-      stream: isMe ? publishedStream : remote,
+      stream: isMe ? publishedStream : remoteStreams[index],
       placeholder: isMe
         ? 'Starting your camera...'
-        : remotePlaceholder(dancer.displayName, state, waitingForMyCamera),
+        : remotePlaceholder(dancer.displayName, connectionStates[index], waitingForMyCamera),
     }
   }
 
-  const dancerVideos =
-    first && second ? [toVideo(first, firstStream, firstState), toVideo(second, secondStream, secondState)] : []
+  const dancerVideos = dancerList.map(toVideo)
 
   return {
     dancerVideos,
