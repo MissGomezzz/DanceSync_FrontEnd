@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -89,5 +89,40 @@ describe('leaving the room', () => {
     expect(screen.getByText('Home page')).toBeTruthy()
     expect(emitWithAck).toHaveBeenCalledWith('room:leave', { roomCode: 'ROOM01', playerId: 'me' })
     expect(useRoomStore.getState().room).toBeNull()
+  })
+})
+
+describe('choosing a role', () => {
+  it('keeps both roles visible and lets the player switch while waiting', async () => {
+    const user = userEvent.setup()
+    let answerRole: (room: Room) => void = () => {}
+    serverAnswers({
+      'room:join': () => Promise.resolve(lobby()),
+      'role:select': () => new Promise<Room>((resolve) => (answerRole = resolve)),
+    })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    const dance = screen.getByRole('button', { name: 'Dance (camera required)' })
+    const spectate = screen.getByRole('button', { name: 'Spectate' })
+    expect(dance.getAttribute('aria-pressed')).toBe('false')
+    expect(spectate.getAttribute('aria-pressed')).toBe('false')
+
+    await user.click(dance)
+    expect(emitWithAck).toHaveBeenCalledWith('role:select', { roomCode: 'ROOM01', playerId: 'me', role: 'dancer' })
+    // Disabled while the server has not answered, so a double click sends one request.
+    expect(dance).toHaveProperty('disabled', true)
+    expect(spectate).toHaveProperty('disabled', true)
+    await act(async () => answerRole(lobby({ players: [{ id: 'me', displayName: 'Me', role: 'dancer' }] })))
+
+    expect(dance.getAttribute('aria-pressed')).toBe('true')
+    expect(spectate).toHaveProperty('disabled', false)
+
+    await user.click(spectate)
+    expect(emitWithAck).toHaveBeenLastCalledWith('role:select', { roomCode: 'ROOM01', playerId: 'me', role: 'spectator' })
+    await act(async () => answerRole(lobby({ players: [{ id: 'me', displayName: 'Me', role: 'spectator' }] })))
+
+    expect(spectate.getAttribute('aria-pressed')).toBe('true')
+    expect(dance.getAttribute('aria-pressed')).toBe('false')
   })
 })

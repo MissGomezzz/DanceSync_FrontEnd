@@ -33,6 +33,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const connection = useConnectionStatus()
 
   const [joining, setJoining] = useState(true)
+  const [rolePending, setRolePending] = useState(false)
   // Bumped by "Try again" to rerun the join effect.
   const [joinAttempt, setJoinAttempt] = useState(0)
 
@@ -52,6 +53,16 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
     // server answer never keeps the player on this page.
     void leaveRoom()
     navigate('/home', { replace: true })
+  }
+
+  const handleSelectRole = async (role: 'dancer' | 'spectator') => {
+    if (rolePending) return
+    setRolePending(true)
+    try {
+      await selectRole(role)
+    } finally {
+      setRolePending(false)
+    }
   }
 
   const inRoom = room?.code === roomCode
@@ -88,8 +99,9 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
       {inRoom && (
         <RoleSelector
           myRole={me?.role}
-          onSelectDancer={() => void selectRole('dancer')}
-          onSelectSpectator={() => void selectRole('spectator')}
+          pending={rolePending}
+          onSelectDancer={() => void handleSelectRole('dancer')}
+          onSelectSpectator={() => void handleSelectRole('spectator')}
         />
       )}
       {inRoom && <SongSelectionPanel room={room} />}
