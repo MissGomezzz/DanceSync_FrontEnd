@@ -38,6 +38,7 @@ export function ChatPanelView({ messages, draft, error, sending, onDraftChange, 
         <div className="flex-1">
           <Input
             id="chat-draft"
+            aria-label="Chat message"
             placeholder="Write a message"
             maxLength={500}
             value={draft}

@@ -29,11 +29,16 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const startBattle = useRoomStore((state) => state.startBattle)
   const selectRole = useRoomStore((state) => state.selectRole)
+  const setError = useRoomStore((state) => state.setError)
   const myId = useAuthStore((state) => state.identity?.id)
   const connection = useConnectionStatus()
 
   const [joining, setJoining] = useState(true)
   const [rolePending, setRolePending] = useState(false)
+  const [startingBattle, setStartingBattle] = useState(false)
+
+  // An error left by another page must not show up in this lobby.
+  useEffect(() => setError(null), [roomCode, setError])
   // Bumped by "Try again" to rerun the join effect.
   const [joinAttempt, setJoinAttempt] = useState(0)
 
@@ -63,6 +68,16 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
       await selectRole(role)
     } finally {
       setRolePending(false)
+    }
+  }
+
+  const handleStartBattle = async () => {
+    if (startingBattle) return
+    setStartingBattle(true)
+    try {
+      await startBattle()
+    } finally {
+      setStartingBattle(false)
     }
   }
 
@@ -116,10 +131,11 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
         hostId={inRoom ? room.hostId : null}
         maxPlayers={MAX_PLAYERS}
         isHost={isHost}
-        canStart={canStart}
+        canStart={canStart && !startingBattle}
+        startingBattle={startingBattle}
         startHint={startHint}
         error={inRoom ? error : null}
-        onStartBattle={() => void startBattle()}
+        onStartBattle={() => void handleStartBattle()}
         onLeave={handleLeave}
       />
     </div>

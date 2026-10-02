@@ -12,6 +12,8 @@ interface RoomLobbyViewProps {
   maxPlayers: number
   isHost: boolean
   canStart: boolean
+  /** battle:start was sent and the server has not answered yet. */
+  startingBattle?: boolean
   startHint: string | null
   error: string | null
   onStartBattle: () => void
@@ -27,6 +29,7 @@ export function RoomLobbyView({
   maxPlayers,
   isHost,
   canStart,
+  startingBattle = false,
   startHint,
   error,
   onStartBattle,
@@ -80,7 +83,7 @@ export function RoomLobbyView({
         </Button>
         {isHost && (
           <Button onClick={onStartBattle} disabled={!canStart}>
-            Start battle
+            {startingBattle ? 'Starting...' : 'Start battle'}
           </Button>
         )}
       </footer>

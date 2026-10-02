@@ -22,11 +22,15 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const joinError = useRoomJoinError()
   const joinRoom = useRoomStore((state) => state.joinRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
+  const setError = useRoomStore((state) => state.setError)
   const { dancerVideos, needsCameraPrompt } = useBattleVideo(roomCode)
   const wordWins = useWordRaceWins()
   const connection = useConnectionStatus()
   // Bound before the (re)join below, so a word already on screen is not missed.
   useWordRaceSync(roomCode)
+
+  // An error left by the lobby (for example a failed song pick) must not show up here.
+  useEffect(() => setError(null), [roomCode, setError])
 
   useEffect(() => {
     // Idempotent rejoin keeps the page working after a refresh mid-battle.

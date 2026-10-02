@@ -179,3 +179,31 @@ describe('Escenario 4: retroalimentación visual en tiempo real', () => {
     expect(input).toHaveProperty('value', '')
   })
 })
+
+describe('submission feedback and in-flight guards', () => {
+  it('tells the dancer their attempt was used when the server rejects the phrase', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    emitWithAck.mockResolvedValue({ room: room(selection({ failedIds: ['me'] })), outcome: 'incorrect' })
+    renderAs('me', room(selection()))
+    await user.type(screen.getByRole('textbox'), 'dale plai{Enter}')
+    expect(screen.getByRole('status').textContent).toMatch(/Not quite — you used your attempt/)
+  })
+
+  it('says time is up when the phrase arrives after the countdown', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    emitWithAck.mockResolvedValue({ room: room(selection()), outcome: 'expired' })
+    renderAs('me', room(selection()))
+    await user.type(screen.getByRole('textbox'), `${PHRASE}{Enter}`)
+    expect(screen.getByRole('status').textContent).toMatch(/Time's up/)
+  })
+
+  it('sends one song pick and disables the songs until the server answers', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    emitWithAck.mockReturnValue(new Promise(() => {}))
+    renderAs('me', room(selection({ phase: 'choosing', chooserId: 'me', chooserReason: 'typed' })))
+    await user.click(screen.getByRole('button', { name: /Bailando/ }))
+    await user.click(screen.getByRole('button', { name: /Dance Monkey/ }))
+    expect(emitWithAck).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: /Dance Monkey/ })).toHaveProperty('disabled', true)
+  })
+})

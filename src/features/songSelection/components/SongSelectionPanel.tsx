@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Room, SongSelection } from '../../../shared/types'
+import type { Room, SongSelection, SongSubmitOutcome } from '../../../shared/types'
 import { Button } from '../../../shared/ui/atoms/Button'
 import { useAuthStore } from '../../auth/store/authStore'
 import { MIN_PLAYERS_TO_START, useRoomStore } from '../../rooms/store/roomStore'
@@ -19,7 +19,29 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
   const myId = useAuthStore((state) => state.identity?.id)
   const startSongChallenge = useRoomStore((state) => state.startSongChallenge)
   const chooseSong = useRoomStore((state) => state.chooseSong)
+  const [startingChallenge, setStartingChallenge] = useState(false)
+  const [choosingSongId, setChoosingSongId] = useState<string | null>(null)
   const selection = room.songSelection
+
+  const handleStartChallenge = async () => {
+    if (startingChallenge) return
+    setStartingChallenge(true)
+    try {
+      await startSongChallenge()
+    } finally {
+      setStartingChallenge(false)
+    }
+  }
+
+  const handleChooseSong = async (songId: string) => {
+    if (choosingSongId) return
+    setChoosingSongId(songId)
+    try {
+      await chooseSong(songId)
+    } finally {
+      setChoosingSongId(null)
+    }
+  }
 
   if (selection?.phase === 'typing') {
     // Keyed by challenge so typed text resets and the input regains focus each round.
@@ -34,7 +56,8 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
         chooserName={chooser?.displayName ?? 'Another player'}
         chooserReason={selection.chooserReason}
         isChooser={selection.chooserId === myId}
-        onChoose={(songId) => void chooseSong(songId)}
+        pendingSongId={choosingSongId}
+        onChoose={(songId) => void handleChooseSong(songId)}
       />
     )
   }
@@ -59,8 +82,8 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
       )}
       {isHost ? (
         <div className="flex items-center gap-3">
-          <Button onClick={() => void startSongChallenge()} disabled={!canStart}>
-            {room.selectedSong ? 'Pick another song' : 'Start song challenge'}
+          <Button onClick={() => void handleStartChallenge()} disabled={!canStart || startingChallenge}>
+            {startingChallenge ? 'Starting...' : room.selectedSong ? 'Pick another song' : 'Start song challenge'}
           </Button>
           {!canStart && (
             <p className="text-sm text-slate-500">At least {MIN_PLAYERS_TO_START} dancers are needed.</p>
@@ -82,6 +105,7 @@ function SongChallenge({ selection, myId }: SongChallengeProps) {
   const submitSongPhrase = useRoomStore((state) => state.submitSongPhrase)
   const [typed, setTyped] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [outcome, setOutcome] = useState<SongSubmitOutcome | null>(null)
   const { challenge } = selection
   const remainingMs = useCountdown(challenge.expiresAt)
   const totalMs = Date.parse(challenge.expiresAt) - Date.parse(challenge.startedAt)
@@ -93,7 +117,11 @@ function SongChallenge({ selection, myId }: SongChallengeProps) {
 
   const notice = !isParticipant
     ? { tone: 'info' as const, text: 'Only dancers can type the phrase. Watch who wins the song choice!' }
-    : hasFailed
+    : outcome === 'incorrect'
+      ? { tone: 'error' as const, text: 'Not quite — you used your attempt. The choice passes to the other players.' }
+      : outcome === 'expired'
+        ? { tone: 'error' as const, text: "Time's up! Your phrase arrived too late." }
+        : hasFailed
       ? { tone: 'error' as const, text: 'Incorrect phrase. Your chance to choose passes to the other players.' }
       : timeUp
         ? { tone: 'error' as const, text: "Time's up! The turn passes to another player." }
@@ -102,7 +130,7 @@ function SongChallenge({ selection, myId }: SongChallengeProps) {
   const handleSubmit = async () => {
     setSubmitting(true)
     // The room update that follows switches the view on success, timeout or failure.
-    await submitSongPhrase(typed)
+    setOutcome(await submitSongPhrase(typed))
     setSubmitting(false)
   }
 

@@ -1,8 +1,7 @@
 import { create } from 'zustand'
-import { useShallow } from 'zustand/react/shallow'
 import { httpClient } from '../../../shared/api/httpClient'
 import { emitWithAck, socket, SocketDomainError } from '../../../shared/lib/socket'
-import type { ChatMessage, DomainErrorPayload, Player, Room, SongSubmitOutcome } from '../../../shared/types'
+import type { ChatMessage, DomainErrorPayload, Room, SongSubmitOutcome } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useChatStore } from '../../chat/store/chatStore'
 import { useWordRaceStore } from '../../wordRace/store/wordRaceStore'
@@ -52,7 +51,10 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   joinError: null,
   setRoom: (room) => set({ room }),
   receiveRoom: (room) => {
-    if (get().isCurrentRoom(room.code)) set({ room })
+    if (!get().isCurrentRoom(room.code)) return
+    // An error from the lobby (or the battle) is stale once the room changes phase.
+    const phaseChanged = get().room?.status !== room.status
+    set(phaseChanged ? { room, error: null } : { room })
   },
   isCurrentRoom: (code) => {
     const normalized = code.toUpperCase()
@@ -232,11 +234,3 @@ export function initRoomSync(): void {
 export const useRoom = () => useRoomStore((state) => state.room)
 export const useRoomError = () => useRoomStore((state) => state.error)
 export const useRoomJoinError = () => useRoomStore((state) => state.joinError)
-
-const selectPlayers = (state: RoomState): Player[] => state.room?.players ?? []
-const selectDancers = (state: RoomState): Player[] => state.room?.dancers ?? []
-const selectSpectators = (state: RoomState): Player[] => state.room?.spectators ?? []
-
-export const usePlayers = () => useRoomStore(useShallow(selectPlayers))
-export const useDancers = () => useRoomStore(useShallow(selectDancers))
-export const useSpectators = () => useRoomStore(useShallow(selectSpectators))

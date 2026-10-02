@@ -6,6 +6,8 @@ interface SongPickerViewProps {
   chooserName: string
   chooserReason: ChooserReason | null
   isChooser: boolean
+  /** Song sent with song:choose and waiting for the server; every button is disabled meanwhile. */
+  pendingSongId?: string | null
   onChoose: (songId: string) => void
 }
 
@@ -22,7 +24,14 @@ function formatDuration(totalSeconds: number): string {
   return `${minutes}:${seconds}`
 }
 
-export function SongPickerView({ songs, chooserName, chooserReason, isChooser, onChoose }: SongPickerViewProps) {
+export function SongPickerView({
+  songs,
+  chooserName,
+  chooserReason,
+  isChooser,
+  pendingSongId = null,
+  onChoose,
+}: SongPickerViewProps) {
   const reason = chooserReason ? reasonLabels[chooserReason] : null
 
   return (
@@ -45,6 +54,8 @@ export function SongPickerView({ songs, chooserName, chooserReason, isChooser, o
               <Button
                 variant="secondary"
                 className="w-full flex-col items-start! text-left"
+                disabled={pendingSongId !== null}
+                aria-busy={pendingSongId === song.id}
                 onClick={() => onChoose(song.id)}
               >
                 <span>{song.title}</span>
