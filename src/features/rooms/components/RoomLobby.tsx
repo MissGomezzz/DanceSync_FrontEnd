@@ -81,8 +81,10 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
       <RoomLobbyView
         roomCode={roomCode}
         players={players}
-        dancers={inRoom ? (room.dancers ?? []) : []}
-        spectators={inRoom ? room.spectators : []}
+        // room.dancers is only filled when the battle starts; in the lobby the
+        // roles each player chose are the source of truth.
+        dancers={players.filter((p) => p.role === 'dancer')}
+        spectators={players.filter((p) => p.role === 'spectator')}
         hostId={inRoom ? room.hostId : null}
         maxPlayers={MAX_PLAYERS}
         isHost={isHost}
