@@ -1,7 +1,7 @@
 # DanceSync_FrontEnd
 
-Frontend of **DanceSync**, a Just-Dance-style web application. Up to 8 users join a room: two of them
-dance-battle in real time while the remaining spectators chat and rate the dancers when the battle ends.
+Frontend of **DanceSync**, a Just-Dance-style web application. Up to 7 users join a room and each chooses
+to dance or to spectate: at least two dancers battle in real time while the spectators chat and rate them.
 Payments are planned for a later stage.
 
 ## Stack
@@ -23,8 +23,8 @@ src/
   app/                composition root: App, router, and application-wide providers
   features/
     auth/             authentication store and components (Azure Entra ID later)
-    rooms/            lobby: create or join a room with up to 8 players
-    battle/           real-time dance battle between the two dancers
+    rooms/            lobby: create or join a room with up to 7 players and choose to dance or spectate
+    battle/           real-time dance battle between the dancers (two or more)
     camera/           camera permission, WebRTC peer session, and video tiles for the battle stage
     chat/             spectator chat
     rating/           spectators rate the dancers at the end of a battle
@@ -63,15 +63,15 @@ at `http://localhost:8080`.
 
 ## Camera / WebRTC
 
-During a battle both dancers stream their camera and everyone in the room (the other dancer and up to six
-spectators) watches it live.
+During a battle every dancer streams their camera and everyone else in the room (the other dancers and the
+spectators) watches it live. The stage shows one tile per dancer in a two-column grid that wraps.
 
 - **Permission flow**: dancers first see an explanation in their stage tile; the browser permission prompt
   only appears after they press "Enable camera". If the permission was granted earlier, the camera starts
   directly.
 - **Video only**: no audio is captured, so the battle music does not echo between peers.
 - **Topology**: a full mesh of peer-to-peer connections. Dancers publish, spectators only receive, and
-  spectators never connect to each other. The dancer offers to each spectator; between the two dancers the
+  spectators never connect to each other. Each dancer offers to each spectator; between any two dancers the
   one with the lexicographically smaller player id offers and a single connection carries video both ways.
 - **Signaling**: offers, answers, and ICE candidates travel over Socket.IO (`webrtc:ready`,
   `webrtc:peer-ready`, `webrtc:signal`) through battle-service, which only validates room membership and

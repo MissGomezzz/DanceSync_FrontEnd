@@ -61,7 +61,7 @@ export function RatingPanelView({
 
       {error && <p className="text-xs text-rose-400">{error}</p>}
       {canRate && (
-        <p className="text-xs text-slate-500">The battle finishes once every spectator has rated both dancers.</p>
+        <p className="text-xs text-slate-500">The battle finishes once every spectator has rated every dancer.</p>
       )}
     </section>
   )

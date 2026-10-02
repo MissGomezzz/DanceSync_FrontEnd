@@ -58,7 +58,7 @@ export function RoomLobbyView({
         <div className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Dancers</h2>
           {dancers.length === 0 && (
-            <p className="text-sm text-slate-500">The first two players to join dance when the battle starts.</p>
+            <p className="text-sm text-slate-500">No dancers yet. Players who choose "Dance" compete in the battle.</p>
           )}
           {dancers.map((player) => (
             <PlayerCard key={player.id} player={player} isHost={player.id === hostId} />

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { defaultGuestName, useAuthStore } from '../features/auth/store/authStore'
-import { useRoomError, useRoomStore } from '../features/rooms/store/roomStore'
+import { MAX_PLAYERS, MIN_PLAYERS_TO_START, useRoomError, useRoomStore } from '../features/rooms/store/roomStore'
 import { Button } from '../shared/ui/atoms/Button'
 import { Input } from '../shared/ui/atoms/Input'
 
@@ -40,8 +40,8 @@ export function HomePage() {
       <header className="text-center">
         <h1 className="text-5xl font-extrabold tracking-tight text-brand-red">DanceSync</h1>
         <p className="mt-3 max-w-md text-slate-400">
-          Join a room with an odd number of players. Some dance to compete while everyone else spectates
-          and votes for the winner.
+          Join a room with up to {MAX_PLAYERS} players. Each player chooses to dance or to spectate: at least{' '}
+          {MIN_PLAYERS_TO_START} dancers compete while the spectators watch and vote for the winner.
         </p>
       </header>
 

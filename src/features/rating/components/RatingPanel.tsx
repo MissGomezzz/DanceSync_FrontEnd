@@ -26,7 +26,7 @@ export function RatingPanel() {
     setPendingDancerId(dancerId)
     try {
       // The battle finishes automatically on the server once every spectator
-      // has rated both dancers; room updates arrive through room:updated.
+      // has rated every dancer; room updates arrive through room:updated.
       await emitWithAck<Room>('rating:submit', {
         roomCode: room.code,
         raterId: myId,

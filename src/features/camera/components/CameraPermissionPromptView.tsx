@@ -54,7 +54,7 @@ function PromptContent({ status, errorMessage, onEnable }: CameraPermissionPromp
         <>
           <h2 className="text-base font-semibold text-slate-100">Turn on your camera</h2>
           <p className="text-sm text-slate-400">
-            You are one of the two dancers in this battle. Your opponent and the spectators will watch your camera
+            You are one of the dancers in this battle. The other dancers and the spectators will watch your camera
             live.
           </p>
           <p className="text-sm text-slate-400">
