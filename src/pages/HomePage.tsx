@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { defaultGuestName, useAuthStore } from '../features/auth/store/authStore'
 import { MAX_PLAYERS, MIN_PLAYERS_TO_START, useRoomError, useRoomStore } from '../features/rooms/store/roomStore'
@@ -10,11 +10,18 @@ export function HomePage() {
   const identity = useAuthStore((state) => state.identity)
   const setDisplayName = useAuthStore((state) => state.setDisplayName)
   const createRoom = useRoomStore((state) => state.createRoom)
+  const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const roomError = useRoomError()
 
   const [name, setName] = useState(() => identity?.displayName ?? defaultGuestName())
   const [joinCode, setJoinCode] = useState('')
   const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    // Reaching home with a room still in the store (logo, Back button) means the
+    // player left it without "Leave room": free the seat instead of keeping it.
+    if (useRoomStore.getState().room) void leaveRoom()
+  }, [leaveRoom])
 
   const handleCreateRoom = async () => {
     setCreating(true)
