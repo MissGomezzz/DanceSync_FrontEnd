@@ -80,14 +80,16 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   leaveRoom: async () => {
     const { room } = get()
     const identity = useAuthStore.getState().identity
+    // Local state goes first: the caller navigates away right away and must not
+    // wait for (or depend on) the server's answer.
+    get().clear()
     if (room && identity) {
       try {
         await emitWithAck<Room | null>('room:leave', { roomCode: room.code, playerId: identity.id })
       } catch {
-        // The room may already be gone; leaving locally is enough.
+        // The room may already be gone or the server unreachable; leaving locally is enough.
       }
     }
-    get().clear()
   },
   selectRole: async (role) => {
     const { room } = get()

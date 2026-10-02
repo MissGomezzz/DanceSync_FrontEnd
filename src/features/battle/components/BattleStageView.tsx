@@ -9,6 +9,8 @@ interface BattleStageViewProps {
   roomCode: string
   room: Room | null
   error: string | null
+  /** Notice shown while the real-time connection is down; renders nothing when connected. */
+  connectionBanner?: ReactNode
   /** One camera tile per dancer; empty before the battle starts. */
   dancerVideos: DancerVideo[]
   /** Shown in the local dancer's tile until the camera is on; null otherwise. */
@@ -30,6 +32,7 @@ export function BattleStageView({
   roomCode,
   room,
   error,
+  connectionBanner = null,
   dancerVideos,
   cameraPrompt,
   wordRace,
@@ -54,7 +57,9 @@ export function BattleStageView({
         </p>
       )}
 
-      {error &&<p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
+      {connectionBanner}
+
+      {error && <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
 
       <div className="relative grid gap-4 sm:grid-cols-2">
         {wordRace}

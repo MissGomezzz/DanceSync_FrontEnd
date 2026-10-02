@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
+import { ConnectionBanner } from '../../../shared/ui/molecules/ConnectionBanner'
 import { useAuthStore } from '../../auth/store/authStore'
 import { SongSelectionPanel } from '../../songSelection/components/SongSelectionPanel'
 import {
@@ -28,13 +30,16 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const startBattle = useRoomStore((state) => state.startBattle)
   const selectRole = useRoomStore((state) => state.selectRole)
   const myId = useAuthStore((state) => state.identity?.id)
+  const connection = useConnectionStatus()
 
   const [joining, setJoining] = useState(true)
+  // Bumped by "Try again" to rerun the join effect.
+  const [joinAttempt, setJoinAttempt] = useState(0)
 
   useEffect(() => {
     setJoining(true)
     void joinRoom(roomCode).finally(() => setJoining(false))
-  }, [roomCode, joinRoom])
+  }, [roomCode, joinRoom, joinAttempt])
 
   useEffect(() => {
     if (room?.code === roomCode && room.status !== 'waiting') {
@@ -42,15 +47,24 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
     }
   }, [room, roomCode, navigate])
 
-  const handleLeave = async () => {
-    await leaveRoom()
-    navigate('/home')
+  const handleLeave = () => {
+    // Best effort: leaveRoom clears the local room at once, so a failed or slow
+    // server answer never keeps the player on this page.
+    void leaveRoom()
+    navigate('/home', { replace: true })
   }
 
   const inRoom = room?.code === roomCode
 
   if (!joining && !inRoom && joinError) {
-    return <RoomUnavailableView roomCode={roomCode} reason={joinError} onBack={() => navigate('/home')} />
+    return (
+      <RoomUnavailableView
+        roomCode={roomCode}
+        reason={joinError}
+        onBack={() => navigate('/home')}
+        onRetry={() => setJoinAttempt((n) => n + 1)}
+      />
+    )
   }
 
   const players = inRoom ? room.players : []
@@ -70,6 +84,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      <ConnectionBanner status={connection} />
       {inRoom && (
         <RoleSelector
           myRole={me?.role}
@@ -92,7 +107,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
         startHint={startHint}
         error={inRoom ? error : null}
         onStartBattle={() => void startBattle()}
-        onLeave={() => void handleLeave()}
+        onLeave={handleLeave}
       />
     </div>
   )

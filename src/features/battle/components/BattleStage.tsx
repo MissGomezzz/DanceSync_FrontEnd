@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
+import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
+import { ConnectionBanner } from '../../../shared/ui/molecules/ConnectionBanner'
 import { CameraPermissionPrompt } from '../../camera/components/CameraPermissionPrompt'
 import { useBattleVideo } from '../../camera/hooks/useBattleVideo'
 import { RoomUnavailableView } from '../../rooms/components/RoomUnavailableView'
@@ -22,6 +24,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const { dancerVideos, needsCameraPrompt } = useBattleVideo(roomCode)
   const wordWins = useWordRaceWins()
+  const connection = useConnectionStatus()
   // Bound before the (re)join below, so a word already on screen is not missed.
   useWordRaceSync(roomCode)
 
@@ -36,9 +39,10 @@ export function BattleStage({ roomCode }: BattleStageProps) {
     }
   }, [room, roomCode, navigate])
 
-  const handleLeave = async () => {
-    await leaveRoom()
-    navigate('/home')
+  const handleLeave = () => {
+    // Best effort, see RoomLobby: never wait for the server to leave the page.
+    void leaveRoom()
+    navigate('/home', { replace: true })
   }
 
   const inRoom = room?.code === roomCode
@@ -51,11 +55,12 @@ export function BattleStage({ roomCode }: BattleStageProps) {
       roomCode={roomCode}
       room={inRoom ? room : null}
       error={error}
+      connectionBanner={<ConnectionBanner status={connection} />}
       dancerVideos={dancerVideos}
       cameraPrompt={needsCameraPrompt ? <CameraPermissionPrompt /> : null}
       wordRace={<WordRaceOverlay />}
       wordWins={wordWins}
-      onLeave={() => void handleLeave()}
+      onLeave={handleLeave}
     />
   )
 }
