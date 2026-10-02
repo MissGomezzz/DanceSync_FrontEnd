@@ -175,6 +175,18 @@ describe('WordRaceOverlay for a dancer', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
+  it('closes the word card when the battle finishes mid-round', () => {
+    renderAs('me')
+    serverEmits('word:round-started', started)
+    expect(screen.getByRole('textbox')).toBeTruthy()
+
+    act(() => useRoomStore.setState({ room: { ...room, status: 'finished' } }))
+
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByTestId('word-race-word')).toBeNull()
+    expect(useWordRaceStore.getState().activeRound).toBeNull()
+  })
+
   it('ignores events from another room', () => {
     renderAs('me')
     serverEmits('word:round-started', { ...started, roomCode: 'OTHER1' })

@@ -49,6 +49,11 @@ interface WordRaceState {
   roundEnded: (event: WordRoundEndedEvent, viewer: WordRaceViewer) => void
   submitWord: (text: string, playerId: string) => Promise<void>
   clearAttempt: () => void
+  /**
+   * Closes the round on screen without a round-ended event, for a battle that
+   * finished mid-round. Keeps the wins tally and any banner already showing.
+   */
+  endRace: () => void
   reset: () => void
 }
 
@@ -155,6 +160,12 @@ export const useWordRaceStore = create<WordRaceState>((set, get) => {
     },
 
     clearAttempt: () => set({ lastAttempt: null }),
+
+    endRace: () => {
+      const { activeRound, submitting, lastAttempt } = get()
+      if (!activeRound && !submitting && !lastAttempt) return
+      set({ activeRound: null, submitting: false, lastAttempt: null })
+    },
 
     reset: () => {
       clearResultTimer()

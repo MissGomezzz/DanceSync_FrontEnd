@@ -26,9 +26,16 @@ export function bindWordRaceSync(roomCode: string): () => void {
   }
   socket.on('word:round-started', onStarted)
   socket.on('word:round-ended', onEnded)
+  // A battle can finish mid-round (song over, a dancer left) without a
+  // round-ended event; the word card must not stay frozen on screen.
+  const unsubscribeRoom = useRoomStore.subscribe((state) => {
+    const { room } = state
+    if (room?.code !== roomCode || room.status !== 'battling') useWordRaceStore.getState().endRace()
+  })
   return () => {
     socket.off('word:round-started', onStarted)
     socket.off('word:round-ended', onEnded)
+    unsubscribeRoom()
     useWordRaceStore.getState().reset()
   }
 }
