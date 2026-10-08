@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { Player } from '../../../shared/types'
+import type { Player, Room } from '../../../shared/types'
 import type { DancerVideo } from '../../camera/hooks/useBattleVideo'
 import { BattleStageView } from './BattleStageView'
 
@@ -10,11 +10,37 @@ function video(id: string, isMe = false): DancerVideo {
   return { dancer: dancer(id), isMe, stream: null, placeholder: `Waiting for ${id}` }
 }
 
-function renderStage(dancerVideos: DancerVideo[], wordWins: Record<string, number> = {}) {
+function roomWith(battle: Partial<NonNullable<Room['battle']>>, status: Room['status'] = 'battling'): Room {
+  const dancers = [dancer('a'), dancer('b')]
+  return {
+    code: 'ROOM01',
+    hostId: 'a',
+    players: dancers,
+    dancers,
+    spectators: [],
+    status,
+    battle: {
+      id: 'b1',
+      roomCode: 'ROOM01',
+      dancerIds: ['a', 'b'],
+      song: null,
+      ratings: [],
+      startedAt: '2026-01-01T00:00:00.000Z',
+      finishedAt: null,
+      result: null,
+      ...battle,
+    },
+    songSelection: null,
+    selectedSong: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  }
+}
+
+function renderStage(dancerVideos: DancerVideo[], wordWins: Record<string, number> = {}, room: Room | null = null) {
   return render(
     <BattleStageView
       roomCode="ROOM01"
-      room={null}
+      room={room}
       error={null}
       dancerVideos={dancerVideos}
       cameraPrompt={null}
@@ -47,5 +73,24 @@ describe('BattleStageView', () => {
     expect(within(b).getByText('1 word')).toBeTruthy()
     expect(within(b).getByText('you')).toBeTruthy()
     expect(within(c).getByText('0 words')).toBeTruthy()
+  })
+
+  it('shows the bonus each dancer has earned so far, and nothing for one without bonus', () => {
+    renderStage([video('a'), video('b')], {}, roomWith({ bonusPoints: { a: 2, b: 0 } }))
+
+    const [a, b] = screen.getAllByRole('figure')
+    expect(within(a).getByText('+2 bonus')).toBeTruthy()
+    expect(within(b).queryByText(/bonus/)).toBeNull()
+  })
+
+  it('breaks the final score down into base and bonus', () => {
+    const finished = roomWith(
+      { bonusPoints: { a: 1, b: 0 }, result: { scores: { a: 9, b: 8 }, winnerId: 'a' } },
+      'finished',
+    )
+    renderStage([video('a'), video('b')], {}, finished)
+
+    expect(screen.getByText('(incl. +1 bonus)')).toBeTruthy()
+    expect(screen.getByText('Winner: A')).toBeTruthy()
   })
 })

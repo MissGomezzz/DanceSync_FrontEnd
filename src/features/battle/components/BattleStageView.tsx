@@ -74,6 +74,9 @@ export function BattleStageView({
               badges={
                 <>
                   {isMe && <Badge tone="success">you</Badge>}
+                  {(room?.battle?.bonusPoints?.[dancer.id] ?? 0) > 0 && (
+                    <Badge tone="success">+{room?.battle?.bonusPoints?.[dancer.id]} bonus</Badge>
+                  )}
                   {wordWins[dancer.id] !== undefined && (
                     <Badge>
                       {wordWins[dancer.id]} {wordWins[dancer.id] === 1 ? 'word' : 'words'}
@@ -90,7 +93,7 @@ export function BattleStageView({
         )}
       </div>
 
-      {room?.status === 'finished' && <ResultPanel dancers={dancers} result={result} />}
+      {room?.status === 'finished' && <ResultPanel dancers={dancers} result={result} bonusPoints={room.battle?.bonusPoints ?? {}} />}
 
       <footer className="flex justify-end gap-3">
         <Button variant="ghost" onClick={onLeave}>
@@ -104,9 +107,11 @@ export function BattleStageView({
 interface ResultPanelProps {
   dancers: Player[] | null
   result: { scores: Record<string, number>; winnerId: string | null } | null
+  /** Word race bonus already included in each total, shown as a breakdown. */
+  bonusPoints: Record<string, number>
 }
 
-function ResultPanel({ dancers, result }: ResultPanelProps) {
+function ResultPanel({ dancers, result, bonusPoints }: ResultPanelProps) {
   if (!result || !dancers) {
     return (
       <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-4 text-sm text-slate-400">
@@ -124,7 +129,12 @@ function ResultPanel({ dancers, result }: ResultPanelProps) {
         {dancers.map((dancer) => (
           <div key={dancer.id} className="flex justify-between rounded-lg bg-slate-900 px-4 py-3">
             <span>{dancer.displayName}</span>
-            <span className="font-semibold">{result.scores[dancer.id] ?? 0}</span>
+            <span className="font-semibold">
+              {result.scores[dancer.id] ?? 0}
+              {(bonusPoints[dancer.id] ?? 0) > 0 && (
+                <span className="ml-2 text-xs font-normal text-emerald-300">(incl. +{bonusPoints[dancer.id]} bonus)</span>
+              )}
+            </span>
           </div>
         ))}
       </div>

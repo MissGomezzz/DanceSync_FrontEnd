@@ -24,6 +24,23 @@ describe('outcomeMessage', () => {
     expect(banner.text).toBe('You were first! You win this round.')
   })
 
+  it('tells the winner how many bonus points the word earned', () => {
+    const won = ended({ winnerId: 'me', winnerName: 'Me', bonusPoints: 1 })
+    expect(outcomeMessage({ myId: 'me', isDancer: true, outcome: 'won', ended: won }).text).toBe(
+      'You were first! +1 bonus point.',
+    )
+    expect(outcomeMessage({ myId: 'me', isDancer: true, outcome: 'won', ended: { ...won, bonusPoints: 3 } }).text).toBe(
+      'You were first! +3 bonus points.',
+    )
+  })
+
+  it('gives no bonus copy to anyone who did not win the round', () => {
+    const lost = outcomeMessage({ myId: 'me', isDancer: true, outcome: null, ended: ended({ bonusPoints: 1 }) })
+    expect(lost.text).not.toMatch(/bonus/)
+    const expired = ended({ reason: 'expired', winnerId: null, winnerName: null, bonusPoints: 0 })
+    expect(outcomeMessage({ myId: 'me', isDancer: true, outcome: null, ended: expired }).text).not.toMatch(/bonus/)
+  })
+
   it('tells a dancer who did not make it who won', () => {
     const banner = outcomeMessage({ myId: 'me', isDancer: true, outcome: null, ended: ended() })
     expect(banner.kind).toBe('lost')

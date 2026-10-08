@@ -126,3 +126,123 @@ describe('choosing a role', () => {
     expect(dance.getAttribute('aria-pressed')).toBe('false')
   })
 })
+
+describe('marking yourself ready', () => {
+  it('turns ready on and off, locks the button while waiting and shows the state on the player card', async () => {
+    const user = userEvent.setup()
+    let answerReady: (room: Room) => void = () => {}
+    serverAnswers({
+      'room:join': () => Promise.resolve(lobby()),
+      'player:ready': () => new Promise<Room>((resolve) => (answerReady = resolve)),
+    })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    const button = screen.getByRole('button', { name: "I'm ready" })
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+
+    await user.click(button)
+    expect(emitWithAck).toHaveBeenCalledWith('player:ready', { roomCode: 'ROOM01', playerId: 'me', ready: true })
+    // Disabled while the server has not answered, so a double click sends one request.
+    expect(button).toHaveProperty('disabled', true)
+    await act(async () =>
+      answerReady(
+        lobby({
+          players: [
+            { id: 'me', displayName: 'Me', role: 'undecided', ready: true },
+            { id: 'rival', displayName: 'Rival', role: 'dancer' },
+          ],
+        }),
+      ),
+    )
+
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(button.textContent).toBe('Ready - click to cancel')
+    expect(button).toHaveProperty('disabled', false)
+    expect(screen.getAllByText('Ready').length).toBeGreaterThan(0)
+
+    await user.click(button)
+    expect(emitWithAck).toHaveBeenLastCalledWith('player:ready', { roomCode: 'ROOM01', playerId: 'me', ready: false })
+    await act(async () => answerReady(lobby()))
+
+    expect(button.getAttribute('aria-pressed')).toBe('false')
+    expect(button.textContent).toBe("I'm ready")
+    expect(screen.queryByText('Ready')).toBeNull()
+  })
+
+  it("shows another player's ready state when the server broadcasts it", async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findAllByText('Rival')
+    expect(screen.queryByText('Ready')).toBeNull()
+
+    act(() =>
+      useRoomStore.getState().receiveRoom(
+        lobby({
+          players: [
+            { id: 'me', displayName: 'Me', role: 'undecided' },
+            { id: 'rival', displayName: 'Rival', role: 'dancer', ready: true },
+          ],
+        }),
+      ),
+    )
+
+    expect(screen.getAllByText('Ready').length).toBeGreaterThan(0)
+  })
+})
+
+describe('starting the battle', () => {
+  const twoDancers = (ready: { me: boolean; rival: boolean }, overrides: Partial<Room> = {}) =>
+    lobby({
+      players: [
+        { id: 'me', displayName: 'Me', role: 'dancer', ready: ready.me },
+        { id: 'rival', displayName: 'Rival', role: 'dancer', ready: ready.rival },
+      ],
+      ...overrides,
+    })
+
+  it('keeps "Start battle" disabled and names who is missing until everyone is ready', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(twoDancers({ me: true, rival: false })) })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    expect(screen.getByRole('button', { name: 'Start battle' })).toHaveProperty('disabled', true)
+    expect(screen.getByText('Waiting for Rival to be ready.')).toBeTruthy()
+
+    act(() => useRoomStore.getState().receiveRoom(twoDancers({ me: true, rival: true })))
+
+    expect(screen.getByRole('button', { name: 'Start battle' })).toHaveProperty('disabled', false)
+    expect(screen.queryByText(/Waiting for/)).toBeNull()
+  })
+
+  it('opens the song challenge first instead of starting the battle', async () => {
+    const user = userEvent.setup()
+    serverAnswers({
+      'room:join': () => Promise.resolve(twoDancers({ me: true, rival: true })),
+      'song-challenge:start': () => new Promise(() => {}),
+    })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    await user.click(screen.getByRole('button', { name: 'Start battle' }))
+
+    expect(emitWithAck).toHaveBeenCalledWith('song-challenge:start', { roomCode: 'ROOM01', requesterId: 'me' })
+    expect(emitWithAck).not.toHaveBeenCalledWith('battle:start', expect.anything())
+  })
+
+  it('starts the battle directly when the song was already chosen', async () => {
+    const user = userEvent.setup()
+    const song = { id: 'song-1', title: 'Dance Monkey', artist: 'Tones and I', durationSeconds: 209 }
+    serverAnswers({
+      'room:join': () => Promise.resolve(twoDancers({ me: true, rival: true }, { selectedSong: song })),
+      'battle:start': () => new Promise(() => {}),
+    })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    await user.click(screen.getByRole('button', { name: 'Start battle' }))
+
+    expect(emitWithAck).toHaveBeenCalledWith('battle:start', { roomCode: 'ROOM01', requesterId: 'me' })
+    expect(emitWithAck).not.toHaveBeenCalledWith('song-challenge:start', expect.anything())
+  })
+})

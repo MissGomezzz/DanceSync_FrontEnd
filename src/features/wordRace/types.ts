@@ -28,6 +28,8 @@ export interface WordRoundEndedEvent {
   reason: 'won' | 'expired'
   /** Rounds won so far per dancer id. */
   wins: Record<string, number>
+  /** Bonus points the winner earned for this round; 0 or absent when nobody won it. */
+  bonusPoints?: number
 }
 
 export interface WordSubmitResult {

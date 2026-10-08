@@ -11,6 +11,8 @@ export interface Player {
   id: string
   displayName: string
   role: PlayerRole
+  /** Marked "ready to dance" in the lobby; absent on servers that predate the ready button. */
+  ready?: boolean
 }
 
 export interface Rating {
@@ -22,7 +24,7 @@ export interface Rating {
 }
 
 export interface BattleResult {
-  /** Total score per dancer id. */
+  /** Total score per dancer id: the spectators' ratings plus the word race bonus. */
   scores: Record<string, number>
   /** Winning dancer id, or null on a tie. */
   winnerId: string | null
@@ -88,6 +90,11 @@ export interface Battle {
   song: Song | null
   /** Every rating submitted, including those for a dancer who left (excluded from the result). */
   ratings: Rating[]
+  /**
+   * Bonus points per dancer id for word race words typed first; added to the
+   * ratings in the final result. Absent on servers that predate the bonus.
+   */
+  bonusPoints?: Record<string, number>
   startedAt: string
   finishedAt: string | null
   /**
