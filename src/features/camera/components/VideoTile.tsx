@@ -31,14 +31,15 @@ export function VideoTile({ stream, label, mirrored = false, placeholder, badges
         <span className="truncate text-lg font-semibold text-slate-100">{label}</span>
         <span className="flex shrink-0 gap-2">{badges}</span>
       </figcaption>
-      <div className="relative aspect-video bg-slate-950">
+      {/* object-contain keeps the whole dancer in frame whatever the camera's aspect ratio. */}
+      <div className="relative aspect-video bg-black">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
           aria-label={`${label} camera`}
-          className={`h-full w-full object-cover ${mirrored ? '-scale-x-100' : ''} ${showVideo ? '' : 'hidden'}`}
+          className={`h-full w-full object-contain ${mirrored ? '-scale-x-100' : ''} ${showVideo ? '' : 'hidden'}`}
         />
         {overlay ??
           (!showVideo && (

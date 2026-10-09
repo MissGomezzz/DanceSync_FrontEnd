@@ -2,7 +2,8 @@ import { create } from 'zustand'
 import type { CameraStatus } from '../types'
 
 const VIDEO_CONSTRAINTS: MediaStreamConstraints = {
-  video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+  // 16:9 matches the battle tiles; cameras that cannot do it are letterboxed, never cropped.
+  video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: { ideal: 16 / 9 }, facingMode: 'user' },
   // Audio stays off on purpose: the battle music would echo through every peer.
   audio: false,
 }
