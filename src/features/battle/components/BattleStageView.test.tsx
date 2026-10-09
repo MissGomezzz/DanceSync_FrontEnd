@@ -74,14 +74,6 @@ describe('BattleStageView', () => {
     expect(within(c).getByText('0 words')).toBeTruthy()
   })
 
-  it('shows the bonus each dancer has earned so far, and nothing for one without bonus', () => {
-    renderStage([video('a'), video('b')], {}, roomWith({ bonusPoints: { a: 2, b: 0 } }))
-
-    const [a, b] = screen.getAllByRole('figure')
-    expect(within(a).getByText('+2 bonus')).toBeTruthy()
-    expect(within(b).queryByText(/bonus/)).toBeNull()
-  })
-
   it('breaks the final score down into base and bonus', () => {
     const finished = roomWith(
       { bonusPoints: { a: 1, b: 0 }, result: { scores: { a: 9, b: 8 }, winnerId: 'a' } },

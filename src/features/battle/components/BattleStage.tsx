@@ -2,11 +2,13 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { useServerTime } from '../../../shared/hooks/useCountdown'
 import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
+import { wordTally, wordsWonOf } from '../../../shared/lib/standings'
 import { ConnectionBanner } from '../../../shared/ui/molecules/ConnectionBanner'
 import { CameraPermissionPrompt } from '../../camera/components/CameraPermissionPrompt'
 import { useBattleVideo } from '../../camera/hooks/useBattleVideo'
 import { RoomUnavailableView } from '../../rooms/components/RoomUnavailableView'
 import { useKickedRedirect } from '../../rooms/hooks/useKickedRedirect'
+import { useScoreboardSync } from '../../scoreboard/hooks/useScoreboardSync'
 import { useRoom, useRoomError, useRoomJoinError, useRoomStore } from '../../rooms/store/roomStore'
 import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
 import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
@@ -31,6 +33,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const connection = useConnectionStatus()
   // Bound before the (re)join below, so a word already on screen is not missed.
   useWordRaceSync(roomCode)
+  useScoreboardSync(roomCode)
   useKickedRedirect(roomCode)
 
   // An error left by the lobby (for example a failed song pick) must not show up here.
@@ -84,7 +87,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
       dancerVideos={dancerVideos}
       cameraPrompt={needsCameraPrompt ? <CameraPermissionPrompt /> : null}
       wordRace={<WordRaceOverlay />}
-      wordWins={wordWins}
+      wordWins={wordTally(wordsWonOf(battle), wordWins)}
       onLeave={handleLeave}
     />
   )

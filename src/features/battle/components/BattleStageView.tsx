@@ -17,7 +17,10 @@ interface BattleStageViewProps {
   cameraPrompt: ReactNode
   /** Word race overlay drawn on top of the dancer tiles. */
   wordRace: ReactNode
-  /** Word race rounds won per dancer id; a dancer without an entry shows no tally. */
+  /**
+   * Word race rounds won per dancer id (the same count the ranking scores); a
+   * dancer without an entry shows no tally.
+   */
   wordWins: Record<string, number>
   onLeave: () => void
   songVideo?: ReactNode
@@ -89,11 +92,6 @@ export function BattleStageView({
                 badges={
                   <>
                     {isMe && <Badge tone="success">you</Badge>}
-                    {(room?.battle?.bonusPoints?.[dancer.id] ?? 0) > 0 && (
-                      <Badge tone="success">
-                        +{room?.battle?.bonusPoints?.[dancer.id]} bonus
-                      </Badge>
-                    )}
                     {wordWins[dancer.id] !== undefined && (
                       <Badge>
                         {wordWins[dancer.id]}{" "}

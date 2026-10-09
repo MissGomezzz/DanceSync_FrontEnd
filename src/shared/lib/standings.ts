@@ -40,6 +40,17 @@ export function wordsWonOf(battle: Battle | null | undefined): Record<string, nu
 }
 
 /**
+ * Word race rounds won per dancer id for the tiles: the server's `wordsWon` and
+ * the tally of the last round-ended event can each be ahead of the other for a
+ * moment, and counts only grow during a battle, so the higher one is current.
+ */
+export function wordTally(serverWordsWon: Record<string, number>, raceWins: Record<string, number>): Record<string, number> {
+  const tally = { ...raceWins }
+  for (const [id, count] of Object.entries(serverWordsWon)) tally[id] = Math.max(count, tally[id] ?? 0)
+  return tally
+}
+
+/**
  * Competition ranking: sorted by score (then name, for a stable order), equal
  * scores share a rank (1, 1, 3).
  */
