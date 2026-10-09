@@ -80,6 +80,12 @@ export interface SongSelection {
 /** Server verdict on a typed phrase. */
 export type SongSubmitOutcome = 'accepted' | 'incorrect' | 'expired'
 
+/** A dancer as recorded in the battle roster. */
+export interface BattleDancer {
+  id: string
+  displayName: string
+}
+
 export interface Battle {
   id: string
   roomCode: string
@@ -89,6 +95,11 @@ export interface Battle {
    */
   dancerIds: string[]
   song: Song | null
+  /**
+   * The dancers when the battle started, kept even after one leaves, so the
+   * result can still name them. Absent on older servers.
+   */
+  roster?: BattleDancer[]
   /** Every rating submitted, including those for a dancer who left (excluded from the result). */
   ratings: Rating[]
   /**

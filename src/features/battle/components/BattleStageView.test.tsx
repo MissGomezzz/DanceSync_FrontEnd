@@ -107,4 +107,36 @@ describe('BattleStageView', () => {
 
     expect(screen.getByText('This song has no video.')).toBeTruthy()
   })
+
+  it('keeps the winner who left the room in the result, named from the battle roster', () => {
+    const finished = roomWith(
+      {
+        roster: [
+          { id: 'a', displayName: 'Alice' },
+          { id: 'b', displayName: 'Bob' },
+        ],
+        result: { scores: { a: 9, b: 8 }, winnerId: 'a' },
+      },
+      'finished',
+    )
+    // Alice left after the battle: she is no longer a player nor a dancer.
+    finished.players = [dancer('b')]
+    finished.dancers = [dancer('b')]
+    renderStage([], {}, finished)
+
+    expect(screen.getByText('Winner: Alice')).toBeTruthy()
+    expect(screen.getByText('Alice')).toBeTruthy()
+    expect(screen.getByText('9')).toBeTruthy()
+  })
+
+  it('falls back to "Former dancer" without a roster, and still announces a tie', () => {
+    const finished = roomWith({ result: { scores: { a: 7, b: 7 }, winnerId: null } }, 'finished')
+    finished.players = [dancer('b')]
+    finished.dancers = [dancer('b')]
+    renderStage([], {}, finished)
+
+    expect(screen.getByText('Former dancer')).toBeTruthy()
+    expect(screen.getByText('B')).toBeTruthy()
+    expect(screen.getByText('It is a tie!')).toBeTruthy()
+  })
 })
