@@ -1,8 +1,8 @@
 # DanceSync_FrontEnd
 
 Frontend of **DanceSync**, a Just-Dance-style web application. Up to 7 users join a room and each chooses
-to dance or to spectate: at least two dancers battle in real time while the spectators rate them, and everyone
-in the room can chat.
+to dance or to spectate: at least two dancers battle in real time while the spectators vote for their favourite,
+everyone follows a live ranking, and everyone in the room can chat.
 Payments are planned for a later stage.
 
 ## Stack
@@ -25,17 +25,20 @@ src/
   features/
     auth/             authentication store and components (Azure Entra ID later)
     rooms/            lobby: create or join a room with up to 7 players and choose to dance or spectate
-    battle/           real-time dance battle between the dancers (two or more)
+    battle/           real-time dance battle between the dancers (two or more) and the players panel
     camera/           camera permission, WebRTC peer session, and video tiles for the battle stage
     chat/             room chat (everyone in the room can write)
-    rating/           spectators rate the dancers at the end of a battle
+    voting/           spectators vote for one favourite dancer and may move or withdraw the vote
+    scoreboard/       live ranking with rank colours and score change indicators
+    results/          end-of-battle announcement, final results dashboard and the "Last battle" card
     songSelection/    lobby typing challenge that decides who picks the song
     wordRace/         mid-battle word race overlay (first dancer to type the word wins the round)
   shared/
     ui/atoms/         smallest reusable UI pieces (Button, Input, Badge)
     ui/molecules/     compositions of atoms (PlayerCard)
     ui/organisms/     larger reusable sections (empty for now)
-    lib/              framework-agnostic helpers: socket singleton, connection status, typed env access
+    lib/              framework-agnostic helpers: socket singleton, connection status, typed env access,
+                      standings (ranking, rank colours, name lookup)
     hooks/            shared React hooks (server-relative countdowns)
     api/              HTTP client targeting the API gateway
     types/            domain types shared across features
@@ -111,6 +114,56 @@ race to type it. battle-service decides the winner atomically; the UI only rende
 - When the round ends everyone sees a banner for 3.5 s: the winner, "Too slow!" or "You typed it, but ...
   got there first" for the other dancers, the winner's name for spectators, or "Time's up!". Each dancer
   tile shows how many words that dancer has won.
+
+## Scoring, voting and the live ranking
+
+battle-service owns the score; the UI only renders what it sends.
+
+- **Score**: `score = 2 x votes + 1 x words won` (the server's `VOTE_POINTS` and `WORD_BONUS_POINTS`). Equal
+  scores share a rank (1, 1, 3); a tie at the top ends the battle as a draw.
+- **Voting** (`features/voting`): each spectator has one vote for a single favourite dancer. Tapping a name
+  votes, tapping another one moves the vote, tapping the selected one withdraws it (`vote:cast` with a
+  `dancerId` or `null`). Votes count from the start of the song until it ends; the panel is disabled with the
+  reason before the start, after the end and for dancers. Only totals are public: each spectator learns their
+  own vote from the `vote:cast` ack and from `vote:mine`, which only they receive.
+- **Live ranking** (`features/scoreboard`): built from `battle.standings` in every room payload, visible to
+  dancers and spectators. Rows are gold, silver and bronze for the first three ranks (tied dancers share the
+  colour). When a score changes the row shows `+N` / `−N` for about 2 s and an arrow when the rank moves; the
+  change is also announced to screen readers ("Ana +2, now 1st"). The diff runs in a store fed by room
+  payloads, never in a render effect, and the first standings after a refresh show no chips.
+- **Names**: a players panel lists everyone with their role and a "you" marker, and every video tile shows the
+  dancer's name over the picture.
+
+## End of the battle, rematch and leaving
+
+- The battle ends when the song clip ends (`battle.endsInMs`), or early when fewer than two dancers are left.
+  Everyone sees a "Battle over!" overlay with the winner or the draw for about 3 s (or until dismissed), then
+  the results dashboard: podium, full table with each dancer's gap to the winner, and why the battle ended.
+- The dashboard is built from `battle.result.standings`; a refreshed client without standings in memory loads
+  the stored match from `GET /api/matches/{battleId}` through the gateway.
+- The host can start a **rematch** (`room:rematch`): the room goes back to the lobby with the same players,
+  the previous result shows as a "Last battle" card, and the vote, word race and score changes are reset.
+- **Leave room** exists in the lobby, the battle and the results. Once pressed it turns red and reads
+  "Leaving…", and the app goes home at once without waiting for the server. While the player is in a room,
+  closing the tab sends `navigator.sendBeacon` to `POST /api/rooms/{code}/leave` with `{ playerId }` (a JSON
+  string sent as `text/plain`, so no CORS preflight) to free the seat immediately. Known limitation: browsers
+  fire the same `pagehide` event on a reload, so reloading the page also leaves the room before rejoining it.
+
+## Real-time events
+
+| Direction | Event | Payload |
+| --- | --- | --- |
+| client to server | `room:join`, `room:leave` | `{ roomCode, playerId, displayName? }` |
+| client to server | `role:select`, `player:ready`, `player:kick` | see `features/rooms/store/roomStore.ts` |
+| client to server | `song-challenge:start`, `song-challenge:submit`, `song:choose`, `battle:start` | see `roomStore.ts` |
+| client to server | `word:submit` | `{ roomCode, playerId, roundId, text }` |
+| client to server | `vote:cast` | `{ roomCode, voterId, dancerId \| null }`, ack `{ dancerId \| null }` |
+| client to server | `room:rematch` | `{ roomCode, requesterId }` (host only), ack: the room |
+| server to client | `room:updated`, `battle:started`, `battle:finished` | the room, with `battle.standings`, `battle.voteCounts`, `battle.wordsWon`, `battle.endReason`, `battle.result.standings` and `lastResult` |
+| server to client | `vote:mine` | `{ roomCode, dancerId \| null }`, only to the voter |
+| server to client | `word:round-started`, `word:round-ended`, `chat:message`, `room:kicked` | see the features |
+
+Payloads for any room other than the current one are ignored. Every acknowledged event times out after 8 s.
 
 ## Environment variables
 
