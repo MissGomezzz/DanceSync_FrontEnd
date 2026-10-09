@@ -4,6 +4,7 @@ import { ChatPanel } from '../../chat/components/ChatPanel'
 import { LiveScoreboard } from '../../scoreboard/components/LiveScoreboard'
 import { VotePanel } from '../../voting/components/VotePanel'
 import { BattleStage } from '../components/BattleStage'
+import { PlayersPanel } from '../components/PlayersPanel'
 
 export function BattlePage() {
   const { roomCode } = useParams<{ roomCode: string }>()
@@ -22,6 +23,7 @@ export function BattlePage() {
       <aside className="flex flex-col gap-6">
         {inBattle && room.status === 'battling' && <LiveScoreboard />}
         {inBattle && <VotePanel />}
+        {inBattle && <PlayersPanel />}
         <ChatPanel roomCode={code} />
       </aside>
     </main>

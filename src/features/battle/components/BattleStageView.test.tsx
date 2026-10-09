@@ -85,6 +85,19 @@ describe('BattleStageView', () => {
     expect(screen.getByText('Winner: A')).toBeTruthy()
   })
 
+  it('draws each dancer name over the video, on a dark backdrop that keeps it readable', () => {
+    renderStage([video('a'), video('b', true)])
+
+    for (const [tile, name] of screen.getAllByRole('figure').map((tile, i) => [tile, i === 0 ? 'A' : 'B'] as const)) {
+      const label = within(tile).getByText(name)
+      const caption = label.closest('figcaption') as HTMLElement
+      // Same box as the video, so the label sits on the picture.
+      expect(caption.parentElement?.contains(within(tile).getByLabelText(`${name} camera`))).toBe(true)
+      expect(caption.className).toContain('absolute')
+      expect(label.className).toContain('bg-black/60')
+    }
+  })
+
   it('says the battle is over instead of promising a video once it finished', () => {
     renderStage([], {}, roomWith({ result: null }, 'finished'))
 
