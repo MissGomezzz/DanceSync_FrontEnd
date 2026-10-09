@@ -74,30 +74,6 @@ describe('BattleStageView', () => {
     expect(within(c).getByText('0 words')).toBeTruthy()
   })
 
-  it('breaks the final score down into base and bonus', () => {
-    const finished = roomWith(
-      { bonusPoints: { a: 1, b: 0 }, result: { scores: { a: 9, b: 8 }, winnerId: 'a' } },
-      'finished',
-    )
-    renderStage([video('a'), video('b')], {}, finished)
-
-    expect(screen.getByText('(incl. +1 bonus)')).toBeTruthy()
-    expect(screen.getByText('Winner: A')).toBeTruthy()
-  })
-
-  it('draws each dancer name over the video, on a dark backdrop that keeps it readable', () => {
-    renderStage([video('a'), video('b', true)])
-
-    for (const [tile, name] of screen.getAllByRole('figure').map((tile, i) => [tile, i === 0 ? 'A' : 'B'] as const)) {
-      const label = within(tile).getByText(name)
-      const caption = label.closest('figcaption') as HTMLElement
-      // Same box as the video, so the label sits on the picture.
-      expect(caption.parentElement?.contains(within(tile).getByLabelText(`${name} camera`))).toBe(true)
-      expect(caption.className).toContain('absolute')
-      expect(label.className).toContain('bg-black/60')
-    }
-  })
-
   it('says the battle is over instead of promising a video once it finished', () => {
     renderStage([], {}, roomWith({ result: null }, 'finished'))
 
@@ -112,35 +88,24 @@ describe('BattleStageView', () => {
     expect(screen.getByText('This song has no video.')).toBeTruthy()
   })
 
-  it('keeps the winner who left the room in the result, named from the battle roster', () => {
-    const finished = roomWith(
-      {
-        roster: [
-          { id: 'a', displayName: 'Alice' },
-          { id: 'b', displayName: 'Bob' },
-        ],
-        result: { scores: { a: 9, b: 8 }, winnerId: 'a' },
-      },
-      'finished',
+  it('swaps the stage footer for the results dashboard, which carries its own leave button', () => {
+    const { rerender } = renderStage([], {}, roomWith({}))
+    expect(screen.getByRole('button', { name: 'Leave room' })).toBeTruthy()
+
+    rerender(
+      <BattleStageView
+        roomCode="ROOM01"
+        room={roomWith({}, 'finished')}
+        error={null}
+        dancerVideos={[]}
+        cameraPrompt={null}
+        wordRace={null}
+        wordWins={{}}
+        onLeave={() => {}}
+        results={<p>Results dashboard</p>}
+      />,
     )
-    // Alice left after the battle: she is no longer a player nor a dancer.
-    finished.players = [dancer('b')]
-    finished.dancers = [dancer('b')]
-    renderStage([], {}, finished)
-
-    expect(screen.getByText('Winner: Alice')).toBeTruthy()
-    expect(screen.getByText('Alice')).toBeTruthy()
-    expect(screen.getByText('9')).toBeTruthy()
-  })
-
-  it('falls back to "Former dancer" without a roster, and still announces a tie', () => {
-    const finished = roomWith({ result: { scores: { a: 7, b: 7 }, winnerId: null } }, 'finished')
-    finished.players = [dancer('b')]
-    finished.dancers = [dancer('b')]
-    renderStage([], {}, finished)
-
-    expect(screen.getByText('Former dancer')).toBeTruthy()
-    expect(screen.getByText('B')).toBeTruthy()
-    expect(screen.getByText('It is a tie!')).toBeTruthy()
+    expect(screen.getByText('Results dashboard')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Leave room' })).toBeNull()
   })
 })

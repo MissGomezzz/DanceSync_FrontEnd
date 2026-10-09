@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Battle, Room } from '../../../shared/types'
@@ -23,7 +23,7 @@ vi.mock('../../songSelection/components/SongPlayer', () => ({
   YOUTUBE_API_UNAVAILABLE: -1,
   SongPlayer: (props: { startAt: number | null; durationSeconds: number }) => {
     songPlayer(props)
-    return null
+    return <p>Song video</p>
   },
 }))
 
@@ -101,5 +101,25 @@ describe('BattleStage song timing', () => {
 
     expect(performance.now() - (props.startAt ?? 0)).toBeGreaterThan(9_000)
     expect(performance.now() - (props.startAt ?? 0)).toBeLessThan(11_000)
+  })
+})
+
+describe('BattleStage song lifecycle (HU 15)', () => {
+  it('keeps the song video mounted while battling and swaps it for the results once the song ends', async () => {
+    await renderWith(battlingRoom({ startsInMs: -1_000, endsInMs: 119_000 }))
+    expect(screen.getByText('Song video')).toBeTruthy()
+
+    const standings = [
+      { dancerId: 'me', displayName: 'Me', votes: 1, wordsWon: 0, score: 2, rank: 1 },
+      { dancerId: 'rival', displayName: 'Rival', votes: 0, wordsWon: 1, score: 1, rank: 2 },
+    ]
+    const finished = battlingRoom({ endsInMs: null, endReason: 'song-end', result: { standings, winnerId: 'me' } })
+    finished.status = 'finished'
+    act(() => useRoomStore.getState().receiveRoom(finished))
+
+    expect(screen.queryByText('Song video')).toBeNull()
+    expect(screen.getByRole('dialog', { name: 'Battle over!' }).textContent).toContain('Me wins!')
+    expect(screen.getByRole('heading', { name: 'Final results' })).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'Leave room' })).toHaveLength(1)
   })
 })

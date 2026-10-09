@@ -24,6 +24,8 @@ interface BattleStageViewProps {
   wordWins: Record<string, number>
   onLeave: () => void
   songVideo?: ReactNode
+  /** Final results dashboard once the battle finished (it carries its own leave button); null before. */
+  results?: ReactNode
 }
 
 const statusLabels: Record<RoomStatus, string> = {
@@ -43,6 +45,7 @@ export function BattleStageView({
   wordWins,
   onLeave,
   songVideo,
+  results = null,
 }: BattleStageViewProps) {
   return (
     <section className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 p-3 sm:p-4">
@@ -62,6 +65,8 @@ export function BattleStageView({
       {connectionBanner}
 
       {error && <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
+
+      {results}
 
       <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,1fr)]">
         {/* Music video */}
@@ -112,15 +117,13 @@ export function BattleStageView({
         </div>
       </div>
 
-      {room?.status === 'finished' && (
-        <ResultPanel room={room} />
+      {!results && (
+        <footer className="flex justify-end gap-3">
+          <Button variant="ghost" onClick={onLeave}>
+            Leave room
+          </Button>
+        </footer>
       )}
-
-      <footer className="flex justify-end gap-3">
-        <Button variant="ghost" onClick={onLeave}>
-          Leave room
-        </Button>
-      </footer>
     </section>
   )
 }
@@ -130,71 +133,4 @@ function songPlaceholder(room: Room | null): string {
   if (room?.status === 'finished') return 'The battle is over.'
   if (room?.status === 'battling' && room.battle?.song && !room.battle.song.youtubeId) return 'This song has no video.'
   return 'The music video will appear when the battle starts.'
-}
-
-/** Shown for a dancer who left and is in no list that still carries their name. */
-const FORMER_DANCER = 'Former dancer'
-
-interface ResultRow {
-  id: string
-  name: string
-  score: number
-  bonus: number
-}
-
-/**
- * One row per scored dancer. Scores come from the result itself, so a dancer
- * who left after the battle (even the winner) is still listed; names come from
- * the roster snapshot taken at the battle start, then from the room.
- */
-function resultRows(room: Room, scores: Record<string, number>): { rows: ResultRow[]; nameOf: (id: string) => string } {
-  const names = new Map<string, string>()
-  const roster = room.battle?.roster ?? []
-  // Later sources win: the roster is the most reliable one.
-  for (const player of room.players) names.set(player.id, player.displayName)
-  for (const dancer of room.dancers ?? []) names.set(dancer.id, dancer.displayName)
-  for (const dancer of roster) names.set(dancer.id, dancer.displayName)
-  const nameOf = (id: string) => names.get(id) ?? FORMER_DANCER
-
-  const ids = new Set([
-    ...roster.map((dancer) => dancer.id).filter((id) => id in scores),
-    ...(room.dancers ?? []).map((dancer) => dancer.id),
-    ...Object.keys(scores),
-  ])
-  const bonusPoints = room.battle?.bonusPoints ?? {}
-  const rows = [...ids].map((id) => ({ id, name: nameOf(id), score: scores[id] ?? 0, bonus: bonusPoints[id] ?? 0 }))
-  return { rows, nameOf }
-}
-
-function ResultPanel({ room }: { room: Room }) {
-  const result = room.battle?.result ?? null
-  if (!result) {
-    return (
-      <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-4 text-sm text-slate-400">
-        The battle ended without a rating result.
-      </div>
-    )
-  }
-
-  const { rows, nameOf } = resultRows(room, result.scores ?? {})
-
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Result</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {rows.map((row) => (
-          <div key={row.id} className="flex justify-between rounded-lg bg-slate-900 px-4 py-3">
-            <span>{row.name}</span>
-            <span className="font-semibold">
-              {row.score}
-              {row.bonus > 0 && <span className="ml-2 text-xs font-normal text-emerald-300">(incl. +{row.bonus} bonus)</span>}
-            </span>
-          </div>
-        ))}
-      </div>
-      <p className="text-sm font-semibold text-emerald-300">
-        {result.winnerId ? `Winner: ${nameOf(result.winnerId)}` : 'It is a tie!'}
-      </p>
-    </div>
-  )
 }

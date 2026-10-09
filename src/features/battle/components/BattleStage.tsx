@@ -3,11 +3,15 @@ import { useNavigate } from 'react-router'
 import { useServerTime } from '../../../shared/hooks/useCountdown'
 import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
 import { wordTally, wordsWonOf } from '../../../shared/lib/standings'
+import { Button } from '../../../shared/ui/atoms/Button'
 import { ConnectionBanner } from '../../../shared/ui/molecules/ConnectionBanner'
+import { useAuthStore } from '../../auth/store/authStore'
 import { CameraPermissionPrompt } from '../../camera/components/CameraPermissionPrompt'
 import { useBattleVideo } from '../../camera/hooks/useBattleVideo'
 import { RoomUnavailableView } from '../../rooms/components/RoomUnavailableView'
 import { useKickedRedirect } from '../../rooms/hooks/useKickedRedirect'
+import { EndAnnouncement } from '../../results/components/EndAnnouncement'
+import { MatchResults } from '../../results/components/MatchResults'
 import { useScoreboardSync } from '../../scoreboard/hooks/useScoreboardSync'
 import { useRoom, useRoomError, useRoomJoinError, useRoomStore } from '../../rooms/store/roomStore'
 import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
@@ -28,6 +32,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const joinRoom = useRoomStore((state) => state.joinRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const setError = useRoomStore((state) => state.setError)
+  const myId = useAuthStore((state) => state.identity?.id ?? null)
   const { dancerVideos, needsCameraPrompt } = useBattleVideo(roomCode)
   const wordWins = useWordRaceWins()
   const connection = useConnectionStatus()
@@ -77,19 +82,36 @@ export function BattleStage({ roomCode }: BattleStageProps) {
       />
     ) : null
 
+  const results =
+    inRoom && room.status === 'finished' ? (
+      <MatchResults
+        room={room}
+        myId={myId}
+        actions={
+          <Button variant="ghost" onClick={handleLeave}>
+            Leave room
+          </Button>
+        }
+      />
+    ) : null
+
   return (
-    <BattleStageView
-      songVideo={songVideo}
-      roomCode={roomCode}
-      room={inRoom ? room : null}
-      error={error}
-      connectionBanner={<ConnectionBanner status={connection} />}
-      dancerVideos={dancerVideos}
-      cameraPrompt={needsCameraPrompt ? <CameraPermissionPrompt /> : null}
-      wordRace={<WordRaceOverlay />}
-      wordWins={wordTally(wordsWonOf(battle), wordWins)}
-      onLeave={handleLeave}
-    />
+    <>
+      <BattleStageView
+        songVideo={songVideo}
+        roomCode={roomCode}
+        room={inRoom ? room : null}
+        error={error}
+        connectionBanner={<ConnectionBanner status={connection} />}
+        dancerVideos={dancerVideos}
+        cameraPrompt={needsCameraPrompt ? <CameraPermissionPrompt /> : null}
+        wordRace={<WordRaceOverlay />}
+        wordWins={wordTally(wordsWonOf(battle), wordWins)}
+        onLeave={handleLeave}
+        results={results}
+      />
+      <EndAnnouncement room={inRoom ? room : null} />
+    </>
   )
 }
 
