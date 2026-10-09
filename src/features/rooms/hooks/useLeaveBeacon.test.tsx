@@ -57,7 +57,7 @@ describe('useLeaveBeacon', () => {
     closeTab()
 
     expect(sendBeacon).toHaveBeenCalledTimes(1)
-    expect(sendBeacon).toHaveBeenCalledWith(`${env.apiUrl}/api/rooms/ROOM01/leave`, JSON.stringify({ playerId: 'me' }))
+    expect(sendBeacon).toHaveBeenCalledWith(`${env.apiUrl}/api/rooms/ROOM01/leave`, JSON.stringify({ playerId: 'me', reason: 'pagehide' }))
   })
 
   it('sends nothing outside a room', () => {

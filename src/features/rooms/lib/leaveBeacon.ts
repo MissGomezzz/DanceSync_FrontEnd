@@ -12,13 +12,17 @@ export function leaveUrl(roomCode: string): string {
  */
 export function sendLeaveBeacon(roomCode: string, playerId: string): boolean {
   if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') return false
-  return navigator.sendBeacon(leaveUrl(roomCode), JSON.stringify({ playerId }))
+  // reason "pagehide": the server waits a short grace before releasing the seat,
+  // because browsers also fire pagehide on a reload and the reloaded page
+  // rejoins within that window (keeping host role and dancer status).
+  return navigator.sendBeacon(leaveUrl(roomCode), JSON.stringify({ playerId, reason: 'pagehide' }))
 }
 
 /**
  * Sends the leave beacon when the page is hidden for good (tab or window
- * closed, navigation to another site), so the seat is freed at once instead of
- * after the server's disconnect grace period. `isStillSeated` is checked when
+ * closed, navigation to another site), so the seat is freed after a short
+ * server-side grace (a reload rejoins within it) instead of the longer
+ * disconnect grace period. `isStillSeated` is checked when
  * the page hides: after an explicit "Leave room" (room:leave already sent) no
  * beacon goes out. Returns the unbind function.
  */

@@ -145,9 +145,11 @@ battle-service owns the score; the UI only renders what it sends.
   the previous result shows as a "Last battle" card, and the vote, word race and score changes are reset.
 - **Leave room** exists in the lobby, the battle and the results. Once pressed it turns red and reads
   "Leaving…", and the app goes home at once without waiting for the server. While the player is in a room,
-  closing the tab sends `navigator.sendBeacon` to `POST /api/rooms/{code}/leave` with `{ playerId }` (a JSON
-  string sent as `text/plain`, so no CORS preflight) to free the seat immediately. Known limitation: browsers
-  fire the same `pagehide` event on a reload, so reloading the page also leaves the room before rejoining it.
+  closing the tab sends `navigator.sendBeacon` to `POST /api/rooms/{code}/leave` with
+  `{ playerId, reason: "pagehide" }` (a JSON string sent as `text/plain`, so no CORS preflight). Browsers fire
+  `pagehide` on a reload too, so the server waits a short grace (`PAGEHIDE_GRACE_MS`, 3 s by default) before
+  releasing the seat: a reload rejoins within it and keeps the host role and dancer status, while a closed
+  tab frees the seat a few seconds later instead of after the longer disconnect grace.
 
 ## Real-time events
 
