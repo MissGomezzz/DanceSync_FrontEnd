@@ -75,12 +75,10 @@ afterEach(() => {
 })
 
 describe('Escenario 1: visualización de la palabra o frase', () => {
-  it('el anfitrión inicia el minijuego desde el lobby', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    emitWithAck.mockResolvedValue(room(selection()))
+  it('sin canción elegida explica que el reto empieza cuando el anfitrión inicia la batalla', () => {
     renderAs('me', room(null))
-    await user.click(screen.getByRole('button', { name: 'Start song challenge' }))
-    expect(emitWithAck).toHaveBeenCalledWith('song-challenge:start', { roomCode: 'ROOM01', requesterId: 'me' })
+    expect(screen.getByText(/When the host starts the battle/)).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
   })
 
   it('muestra la frase, el temporizador y un campo de texto con el foco', () => {

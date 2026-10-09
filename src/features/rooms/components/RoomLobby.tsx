@@ -12,6 +12,7 @@ import {
   useRoomJoinError,
   useRoomStore,
 } from '../store/roomStore'
+import { ReadyButton } from './ReadyButton'
 import { RoleSelector } from './RoleSelector'
 import { RoomUnavailableView } from './RoomUnavailableView'
 import { RoomLobbyView } from './RoomLobbyView'
@@ -28,13 +29,16 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const joinRoom = useRoomStore((state) => state.joinRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const startBattle = useRoomStore((state) => state.startBattle)
+  const startSongChallenge = useRoomStore((state) => state.startSongChallenge)
   const selectRole = useRoomStore((state) => state.selectRole)
+  const setReady = useRoomStore((state) => state.setReady)
   const setError = useRoomStore((state) => state.setError)
   const myId = useAuthStore((state) => state.identity?.id)
   const connection = useConnectionStatus()
 
   const [joining, setJoining] = useState(true)
   const [rolePending, setRolePending] = useState(false)
+  const [readyPending, setReadyPending] = useState(false)
   const [startingBattle, setStartingBattle] = useState(false)
 
   // An error left by another page must not show up in this lobby.
@@ -71,11 +75,25 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
     }
   }
 
+  const handleToggleReady = async () => {
+    if (readyPending) return
+    setReadyPending(true)
+    try {
+      await setReady(!me?.ready)
+    } finally {
+      setReadyPending(false)
+    }
+  }
+
   const handleStartBattle = async () => {
     if (startingBattle) return
     setStartingBattle(true)
     try {
-      await startBattle()
+      // Starting a battle begins with the song challenge; the server starts the battle
+      // itself once the song is chosen. With a song already chosen (the battle could not
+      // start when it was picked) only the battle is left to start.
+      if (room?.selectedSong) await startBattle()
+      else await startSongChallenge()
     } finally {
       setStartingBattle(false)
     }
@@ -100,14 +118,17 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const isHost = inRoom && myId !== undefined && room.hostId === myId
   const songPhase = inRoom ? room.songSelection?.phase : undefined
   const choosingSong = songPhase === 'typing' || songPhase === 'choosing'
-  const canStart = isHost && dancerCount >= MIN_PLAYERS_TO_START && !choosingSong
+  const waitingFor = players.filter((p) => !p.ready)
+  const canStart = isHost && dancerCount >= MIN_PLAYERS_TO_START && !choosingSong && waitingFor.length === 0
   const startHint = !isHost
     ? null
     : dancerCount < MIN_PLAYERS_TO_START
       ? `At least ${MIN_PLAYERS_TO_START} players must choose "Dance" to start.`
       : choosingSong
         ? 'Wait until the song has been chosen.'
-        : null
+        : waitingFor.length > 0
+          ? `Waiting for ${waitingFor.map((p) => p.displayName).join(', ')} to be ready.`
+          : null
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -120,6 +141,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
           onSelectSpectator={() => void handleSelectRole('spectator')}
         />
       )}
+      {inRoom && <ReadyButton ready={me?.ready === true} pending={readyPending} onToggle={() => void handleToggleReady()} />}
       {inRoom && <SongSelectionPanel room={room} />}
       <RoomLobbyView
         roomCode={roomCode}

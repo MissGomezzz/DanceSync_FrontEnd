@@ -17,7 +17,9 @@ export function outcomeMessage({ myId, isDancer, outcome, ended }: OutcomeMessag
   }
   const winner = ended.winnerName ?? 'Another dancer'
   if (myId !== null && ended.winnerId === myId) {
-    return { ...base, kind: 'won', text: 'You were first! You win this round.' }
+    const bonus = ended.bonusPoints ?? 0
+    const text = bonus > 0 ? `You were first! +${bonus} bonus ${bonus === 1 ? 'point' : 'points'}.` : 'You were first! You win this round.'
+    return { ...base, kind: 'won', text }
   }
   if (!isDancer) {
     return { ...base, kind: 'watching', text: `${winner} typed it first!` }

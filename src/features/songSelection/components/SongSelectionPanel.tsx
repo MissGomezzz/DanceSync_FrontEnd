@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import type { Room, SongSelection, SongSubmitOutcome } from '../../../shared/types'
-import { Button } from '../../../shared/ui/atoms/Button'
 import { useAuthStore } from '../../auth/store/authStore'
-import { MIN_PLAYERS_TO_START, useRoomStore } from '../../rooms/store/roomStore'
+import { useRoomStore } from '../../rooms/store/roomStore'
 import { useCountdown, useServerDeadline } from '../../../shared/hooks/useCountdown'
 import { SongChallengeView } from './SongChallengeView'
 import { SongPickerView, type SongPickerViewProps } from './SongPickerView'
@@ -12,26 +11,15 @@ interface SongSelectionPanelProps {
 }
 
 /**
- * Lobby step that decides who picks the song: the host starts a typing
- * challenge, the first dancer to type the phrase exactly wins the choice.
+ * Lobby step that decides who picks the song. It starts when the host presses
+ * "Start battle" (see RoomLobby): the first dancer to type the phrase exactly
+ * wins the choice, and the server starts the battle as soon as the song is chosen.
  */
 export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
   const myId = useAuthStore((state) => state.identity?.id)
-  const startSongChallenge = useRoomStore((state) => state.startSongChallenge)
   const chooseSong = useRoomStore((state) => state.chooseSong)
-  const [startingChallenge, setStartingChallenge] = useState(false)
   const [choosingSongId, setChoosingSongId] = useState<string | null>(null)
   const selection = room.songSelection
-
-  const handleStartChallenge = async () => {
-    if (startingChallenge) return
-    setStartingChallenge(true)
-    try {
-      await startSongChallenge()
-    } finally {
-      setStartingChallenge(false)
-    }
-  }
 
   const handleChooseSong = async (songId: string) => {
     if (choosingSongId) return
@@ -63,10 +51,6 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
     )
   }
 
-  const isHost = room.hostId === myId
-  const dancerCount = room.players.filter((p) => p.role === 'dancer').length
-  const canStart = dancerCount >= MIN_PLAYERS_TO_START
-
   return (
     <section
       aria-label="Song"
@@ -84,19 +68,10 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
           )}
         </>
       ) : (
-        <p className="text-sm text-slate-400">No song chosen yet. Win the typing challenge to pick it.</p>
-      )}
-      {isHost ? (
-        <div className="flex items-center gap-3">
-          <Button onClick={() => void handleStartChallenge()} disabled={!canStart || startingChallenge}>
-            {startingChallenge ? 'Starting...' : room.selectedSong ? 'Pick another song' : 'Start song challenge'}
-          </Button>
-          {!canStart && (
-            <p className="text-sm text-slate-500">At least {MIN_PLAYERS_TO_START} dancers are needed.</p>
-          )}
-        </div>
-      ) : (
-        <p className="text-sm text-slate-500">The host starts the song challenge.</p>
+        <p className="text-sm text-slate-400">
+          No song chosen yet. When the host starts the battle, the dancers race to type a phrase and the winner picks
+          the song.
+        </p>
       )}
     </section>
   )

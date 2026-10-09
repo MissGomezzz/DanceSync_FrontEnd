@@ -29,6 +29,8 @@ interface RoomState {
   joinRoom: (roomCode: string) => Promise<Room | null>
   leaveRoom: () => Promise<void>
   selectRole: (role: 'dancer' | 'spectator') => Promise<void>
+  /** Marks the player ready (true) or not ready (false) for every participant in the room. */
+  setReady: (ready: boolean) => Promise<void>
   startBattle: () => Promise<void>
   startSongChallenge: () => Promise<void>
   /** Returns the server verdict, or null when the submission could not be processed. */
@@ -139,6 +141,22 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         roomCode: room.code,
         playerId: identity.id,
         role,
+      })
+      get().receiveRoom(updated)
+      set({ error: null })
+    } catch (error) {
+      set({ error: toErrorMessage(error) })
+    }
+  },
+  setReady: async (ready) => {
+    const { room } = get()
+    const identity = useAuthStore.getState().identity
+    if (!room || !identity) return
+    try {
+      const updated = await emitWithAck<Room>('player:ready', {
+        roomCode: room.code,
+        playerId: identity.id,
+        ready,
       })
       get().receiveRoom(updated)
       set({ error: null })

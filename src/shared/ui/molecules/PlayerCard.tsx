@@ -12,6 +12,7 @@ export function PlayerCard({ player, isHost = false }: PlayerCardProps) {
       <span className="font-medium text-slate-100">{player.displayName}</span>
       <div className="flex items-center gap-2">
         {isHost && <Badge tone="success">Host</Badge>}
+        <Badge tone={player.ready ? 'success' : 'neutral'}>{player.ready ? 'Ready' : 'Not ready'}</Badge>
         <Badge tone={player.role === 'dancer' ? 'accent' : 'neutral'}>{player.role}</Badge>
       </div>
     </div>
