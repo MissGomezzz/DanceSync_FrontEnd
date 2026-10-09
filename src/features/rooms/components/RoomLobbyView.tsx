@@ -3,6 +3,7 @@ import type { Player } from '../../../shared/types'
 import { Badge } from '../../../shared/ui/atoms/Badge'
 import { Button } from '../../../shared/ui/atoms/Button'
 import { PlayerCard } from '../../../shared/ui/molecules/PlayerCard'
+import { LeaveRoomButton } from './LeaveRoomButton'
 
 interface RoomLobbyViewProps {
   roomCode: string
@@ -98,9 +99,7 @@ export function RoomLobbyView({
 
       <footer className="flex items-center justify-end gap-3">
         {startHint && <p className="text-sm text-slate-500">{startHint}</p>}
-        <Button variant="ghost" onClick={onLeave}>
-          Leave room
-        </Button>
+        <LeaveRoomButton onLeave={onLeave} />
         {isHost && (
           <Button onClick={onStartBattle} disabled={!canStart}>
             {startingBattle ? 'Starting...' : 'Start battle'}

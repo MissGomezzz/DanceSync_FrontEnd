@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react'
 import type { Room, RoomStatus } from '../../../shared/types'
 import { Badge } from '../../../shared/ui/atoms/Badge'
-import { Button } from '../../../shared/ui/atoms/Button'
 import { VideoTile } from '../../camera/components/VideoTile'
 import type { DancerVideo } from '../../camera/hooks/useBattleVideo'
+import { LeaveRoomButton } from '../../rooms/components/LeaveRoomButton'
 
 interface BattleStageViewProps {
   roomCode: string
@@ -119,9 +119,7 @@ export function BattleStageView({
 
       {!results && (
         <footer className="flex justify-end gap-3">
-          <Button variant="ghost" onClick={onLeave}>
-            Leave room
-          </Button>
+          <LeaveRoomButton onLeave={onLeave} />
         </footer>
       )}
     </section>

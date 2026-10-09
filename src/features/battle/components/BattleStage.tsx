@@ -9,6 +9,7 @@ import { useAuthStore } from '../../auth/store/authStore'
 import { CameraPermissionPrompt } from '../../camera/components/CameraPermissionPrompt'
 import { useBattleVideo } from '../../camera/hooks/useBattleVideo'
 import { RoomUnavailableView } from '../../rooms/components/RoomUnavailableView'
+import { LeaveRoomButton } from '../../rooms/components/LeaveRoomButton'
 import { useKickedRedirect } from '../../rooms/hooks/useKickedRedirect'
 import { EndAnnouncement } from '../../results/components/EndAnnouncement'
 import { MatchResults } from '../../results/components/MatchResults'
@@ -111,9 +112,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
             ) : (
               <p className="self-center text-sm text-slate-500">The host can start a rematch.</p>
             )}
-            <Button variant="ghost" onClick={handleLeave}>
-              Leave room
-            </Button>
+            <LeaveRoomButton onLeave={handleLeave} />
           </>
         }
       />
