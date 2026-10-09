@@ -39,12 +39,13 @@ export function BattleStageView({
   wordRace,
   wordWins,
   onLeave,
+  songVideo,
 }: BattleStageViewProps) {
   const dancers = room?.dancers ?? null
   const result = room?.battle?.result ?? null
 
   return (
-    <section className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-6">
+    <section className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 p-3 sm:p-4">
       <header className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Battle in room {roomCode}</h1>
         {room && (
@@ -61,49 +62,71 @@ export function BattleStageView({
       {connectionBanner}
 
       {error && <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
+      
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,1fr)]">
+        {/* Music video*/}
+        <div className="min-w-0">
+          {songVideo ? (
+            <div className="w-full overflow-hidden rounded-xl border border-slate-800 bg-black">
+              {songVideo}
+            </div>
+          ) : (
+            <div className="flex aspect-video items-center justify-center rounded-xl border border-slate-800 bg-slate-950 p-4 text-center text-sm text-slate-400">
+              The music video will appear when the battle starts.
+            </div>
+          )}
+        </div>
 
-      <div className="relative grid gap-4 sm:grid-cols-2">
-        {wordRace}
-        {dancerVideos.length > 0 ? (
-          dancerVideos.map(({ dancer, isMe, stream, placeholder }) => (
-            <VideoTile
-              key={dancer.id}
-              label={dancer.displayName}
-              stream={stream}
-              mirrored={isMe}
-              placeholder={placeholder}
-              badges={
-                <>
-                  {isMe && <Badge tone="success">you</Badge>}
-                  {(room?.battle?.bonusPoints?.[dancer.id] ?? 0) > 0 && (
-                    <Badge tone="success">+{room?.battle?.bonusPoints?.[dancer.id]} bonus</Badge>
-                  )}
-                  {wordWins[dancer.id] !== undefined && (
-                    <Badge>
-                      {wordWins[dancer.id]} {wordWins[dancer.id] === 1 ? 'word' : 'words'}
-                    </Badge>
-                  )}
-                  <Badge tone="accent">dancer</Badge>
-                </>
-              }
-              overlay={isMe ? cameraPrompt : null}
-            />
-          ))
-        ) : (
-          <p className="text-sm text-slate-500 sm:col-span-2">Waiting for the battle to start.</p>
-        )}
+        {/*Cameras to the left*/}
+        <div className="relative grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 lg:content-start">
+          {wordRace}
+
+          {dancerVideos.length > 0 ? (
+            dancerVideos.map(({ dancer, isMe, stream, placeholder }) => (
+              <VideoTile
+                key={dancer.id}
+                label={dancer.displayName}
+                stream={stream}
+                mirrored={isMe}
+                placeholder={placeholder}
+                badges={
+                  <>
+                    {isMe && <Badge tone="success">you</Badge>}
+                    {(room?.battle?.bonusPoints?.[dancer.id] ?? 0) > 0 && (
+                      <Badge tone="success">
+                        +{room?.battle?.bonusPoints?.[dancer.id]} bonus
+                      </Badge>
+                    )}
+                    {wordWins[dancer.id] !== undefined && (
+                      <Badge>
+                        {wordWins[dancer.id]}{" "}
+                        {wordWins[dancer.id] === 1 ? "word" : "words"}
+                      </Badge>
+                    )}
+                    <Badge tone="accent">dancer</Badge>
+                  </>
+                }
+                overlay={isMe ? cameraPrompt : null}
+              />
+            ))
+          ) : (
+            <p className="text-sm text-slate-500 sm:col-span-2 lg:col-span-1">
+              Waiting for the battle to start.
+            </p>
+          )}
+        </div>
       </div>
 
-      {room?.status === 'finished' && <ResultPanel dancers={dancers} result={result} bonusPoints={room.battle?.bonusPoints ?? {}} />}
+            {room?.status === 'finished' && <ResultPanel dancers={dancers} result={result} bonusPoints={room.battle?.bonusPoints ?? {}} />}
 
-      <footer className="flex justify-end gap-3">
-        <Button variant="ghost" onClick={onLeave}>
-          Leave room
-        </Button>
-      </footer>
-    </section>
-  )
-}
+            <footer className="flex justify-end gap-3">
+              <Button variant="ghost" onClick={onLeave}>
+                Leave room
+              </Button>
+            </footer>
+          </section>
+        )
+      }
 
 interface ResultPanelProps {
   dancers: Player[] | null
