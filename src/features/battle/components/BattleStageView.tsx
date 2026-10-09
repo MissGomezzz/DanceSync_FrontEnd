@@ -62,9 +62,9 @@ export function BattleStageView({
       {connectionBanner}
 
       {error && <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
-      
+
       <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,1fr)]">
-        {/* Music video*/}
+        {/* Music video */}
         <div className="min-w-0">
           {songVideo ? (
             <div className="w-full overflow-hidden rounded-xl border border-slate-800 bg-black">
@@ -72,12 +72,12 @@ export function BattleStageView({
             </div>
           ) : (
             <div className="flex aspect-video items-center justify-center rounded-xl border border-slate-800 bg-slate-950 p-4 text-center text-sm text-slate-400">
-              The music video will appear when the battle starts.
+              {songPlaceholder(room)}
             </div>
           )}
         </div>
 
-        {/*Cameras to the left*/}
+        {/* Dancer cameras */}
         <div className="relative grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 lg:content-start">
           {wordRace}
 
@@ -117,16 +117,25 @@ export function BattleStageView({
         </div>
       </div>
 
-            {room?.status === 'finished' && <ResultPanel dancers={dancers} result={result} bonusPoints={room.battle?.bonusPoints ?? {}} />}
+      {room?.status === 'finished' && (
+        <ResultPanel dancers={dancers} result={result} bonusPoints={room.battle?.bonusPoints ?? {}} />
+      )}
 
-            <footer className="flex justify-end gap-3">
-              <Button variant="ghost" onClick={onLeave}>
-                Leave room
-              </Button>
-            </footer>
-          </section>
-        )
-      }
+      <footer className="flex justify-end gap-3">
+        <Button variant="ghost" onClick={onLeave}>
+          Leave room
+        </Button>
+      </footer>
+    </section>
+  )
+}
+
+/** What the song area says when there is no video to play. */
+function songPlaceholder(room: Room | null): string {
+  if (room?.status === 'finished') return 'The battle is over.'
+  if (room?.status === 'battling' && room.battle?.song && !room.battle.song.youtubeId) return 'This song has no video.'
+  return 'The music video will appear when the battle starts.'
+}
 
 interface ResultPanelProps {
   dancers: Player[] | null

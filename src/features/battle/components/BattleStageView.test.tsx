@@ -93,4 +93,18 @@ describe('BattleStageView', () => {
     expect(screen.getByText('(incl. +1 bonus)')).toBeTruthy()
     expect(screen.getByText('Winner: A')).toBeTruthy()
   })
+
+  it('says the battle is over instead of promising a video once it finished', () => {
+    renderStage([], {}, roomWith({ result: null }, 'finished'))
+
+    expect(screen.getByText('The battle is over.')).toBeTruthy()
+    expect(screen.queryByText(/will appear when the battle starts/)).toBeNull()
+  })
+
+  it('says so when the battle song has no video', () => {
+    const song = { id: 's1', title: 'Song', artist: 'Artist', durationSeconds: 90 }
+    renderStage([], {}, roomWith({ song }))
+
+    expect(screen.getByText('This song has no video.')).toBeTruthy()
+  })
 })
