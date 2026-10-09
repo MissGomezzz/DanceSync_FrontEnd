@@ -12,6 +12,7 @@ import {
   useRoomJoinError,
   useRoomStore,
 } from '../store/roomStore'
+import { useKickedRedirect } from '../hooks/useKickedRedirect'
 import { ReadyButton } from './ReadyButton'
 import { RoleSelector } from './RoleSelector'
 import { RoomUnavailableView } from './RoomUnavailableView'
@@ -32,6 +33,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const startSongChallenge = useRoomStore((state) => state.startSongChallenge)
   const selectRole = useRoomStore((state) => state.selectRole)
   const setReady = useRoomStore((state) => state.setReady)
+  const kickPlayer = useRoomStore((state) => state.kickPlayer)
   const setError = useRoomStore((state) => state.setError)
   const myId = useAuthStore((state) => state.identity?.id)
   const connection = useConnectionStatus()
@@ -39,6 +41,9 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const [rolePending, setRolePending] = useState(false)
   const [readyPending, setReadyPending] = useState(false)
   const [startingBattle, setStartingBattle] = useState(false)
+  const [kickingPlayerId, setKickingPlayerId] = useState<string | null>(null)
+
+  useKickedRedirect(roomCode)
 
   // An error left by another page must not show up in this lobby.
   useEffect(() => setError(null), [roomCode, setError])
@@ -84,6 +89,17 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
       await setReady(!me?.ready)
     } finally {
       setReadyPending(false)
+    }
+  }
+
+  const handleKick = async (playerId: string) => {
+    // One removal at a time: a double click must not send two requests.
+    if (kickingPlayerId !== null) return
+    setKickingPlayerId(playerId)
+    try {
+      await kickPlayer(playerId)
+    } finally {
+      setKickingPlayerId(null)
     }
   }
 
@@ -161,6 +177,8 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
         error={inRoom ? error : null}
         onStartBattle={() => void handleStartBattle()}
         onLeave={handleLeave}
+        onKick={isHost ? (playerId) => void handleKick(playerId) : undefined}
+        kickingPlayerId={kickingPlayerId}
       />
     </div>
   )

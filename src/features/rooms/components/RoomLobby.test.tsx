@@ -7,12 +7,19 @@ import { useAuthStore } from '../../auth/store/authStore'
 import { useRoomStore } from '../store/roomStore'
 import { RoomLobby } from './RoomLobby'
 
-const { emitWithAck } = vi.hoisted(() => ({ emitWithAck: vi.fn() }))
+const { emitWithAck, handlers } = vi.hoisted(() => ({
+  emitWithAck: vi.fn(),
+  handlers: new Map<string, (payload: unknown) => void>(),
+}))
 
 vi.mock('../../../shared/lib/socket', () => ({
   emitWithAck,
   connectSocket: vi.fn(),
-  socket: { on: vi.fn(), off: vi.fn(), io: { on: vi.fn() } },
+  socket: {
+    on: vi.fn((event: string, handler: (payload: unknown) => void) => handlers.set(event, handler)),
+    off: vi.fn(),
+    io: { on: vi.fn() },
+  },
   SocketDomainError: class extends Error {},
 }))
 
@@ -56,7 +63,7 @@ function renderLobby() {
 beforeEach(() => {
   emitWithAck.mockReset()
   useAuthStore.setState({ identity: { id: 'me', displayName: 'Me' } })
-  useRoomStore.setState({ room: null, error: null, joinError: null })
+  useRoomStore.setState({ room: null, error: null, joinError: null, notice: null, kickedFrom: null })
 })
 
 describe('joining the room', () => {
@@ -247,5 +254,72 @@ describe('starting the battle', () => {
 
     expect(emitWithAck).toHaveBeenCalledWith('battle:start', { roomCode: 'ROOM01', requesterId: 'me' })
     expect(emitWithAck).not.toHaveBeenCalledWith('song-challenge:start', expect.anything())
+  })
+})
+
+describe('removing a player', () => {
+  it('lets the host remove another player after confirming, one request at a time', async () => {
+    const user = userEvent.setup()
+    let answerKick: (room: Room) => void = () => {}
+    serverAnswers({
+      'room:join': () => Promise.resolve(lobby()),
+      'player:kick': () => new Promise<Room>((resolve) => (answerKick = resolve)),
+    })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    // The host cannot remove themselves.
+    expect(screen.queryByRole('button', { name: 'Remove Me' })).toBeNull()
+    await user.click(screen.getByRole('button', { name: 'Remove Rival' }))
+    expect(emitWithAck).not.toHaveBeenCalledWith('player:kick', expect.anything())
+
+    const confirm = screen.getByRole('button', { name: 'Confirm removing Rival' })
+    await user.click(confirm)
+    await user.click(confirm)
+
+    expect(emitWithAck).toHaveBeenCalledWith('player:kick', { roomCode: 'ROOM01', requesterId: 'me', playerId: 'rival' })
+    expect(emitWithAck.mock.calls.filter(([event]) => event === 'player:kick')).toHaveLength(1)
+    expect(confirm).toHaveProperty('disabled', true)
+
+    await act(async () => answerKick(lobby({ players: [{ id: 'me', displayName: 'Me', role: 'undecided' }] })))
+    expect(screen.queryByText('Rival')).toBeNull()
+  })
+
+  it('can be cancelled', async () => {
+    const user = userEvent.setup()
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    await user.click(screen.getByRole('button', { name: 'Remove Rival' }))
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByRole('button', { name: 'Remove Rival' })).toBeTruthy()
+    expect(emitWithAck).not.toHaveBeenCalledWith('player:kick', expect.anything())
+  })
+
+  it('shows no "Remove" button to a player who is not the host', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby({ hostId: 'rival' })) })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    expect(screen.queryByRole('button', { name: /^Remove/ })).toBeNull()
+  })
+
+  it('sends the removed player home with a notice, and ignores a removal from another room', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby({ hostId: 'rival' })) })
+    renderLobby()
+    await screen.findAllByText('Rival')
+
+    act(() => handlers.get('room:kicked')?.({ roomCode: 'OTHER1' }))
+    expect(screen.queryByText('Home page')).toBeNull()
+    expect(useRoomStore.getState().room?.code).toBe('ROOM01')
+
+    act(() => handlers.get('room:kicked')?.({ roomCode: 'ROOM01' }))
+
+    expect(screen.getByText('Home page')).toBeTruthy()
+    expect(useRoomStore.getState().room).toBeNull()
+    expect(useRoomStore.getState().notice).toBe('The host removed you from the room.')
+    expect(useRoomStore.getState().kickedFrom).toBeNull()
   })
 })

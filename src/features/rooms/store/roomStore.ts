@@ -9,10 +9,16 @@ import { useWordRaceStore } from '../../wordRace/store/wordRaceStore'
 export const MAX_PLAYERS = 7
 export const MIN_PLAYERS_TO_START = 2
 
+export const KICKED_NOTICE = 'The host removed you from the room.'
+
 interface RoomState {
   room: Room | null
   error: string | null
   joinError: string | null
+  /** Dismissible message for the home page (for example after being removed from a room). */
+  notice: string | null
+  /** Room the host removed this player from; the page showing it goes home and clears it. */
+  kickedFrom: string | null
   setRoom: (room: Room | null) => void
   /**
    * Applies a room pushed by the server (broadcast or ack). Ignored unless it is
@@ -23,6 +29,11 @@ interface RoomState {
   /** True when `code` is the current room or the one being joined. */
   isCurrentRoom: (code: string) => boolean
   setError: (error: string | null) => void
+  dismissNotice: () => void
+  /** Applies room:kicked: drops the room (if it is the current one) and leaves a notice for home. */
+  receiveKick: (roomCode: string) => void
+  /** Called once the page of the room the player was removed from has navigated away. */
+  acknowledgeKick: () => void
   /** Drops the room and every room-scoped store (chat, word race). */
   clear: () => void
   createRoom: (displayName: string) => Promise<Room | null>
@@ -31,6 +42,8 @@ interface RoomState {
   selectRole: (role: 'dancer' | 'spectator') => Promise<void>
   /** Marks the player ready (true) or not ready (false) for every participant in the room. */
   setReady: (ready: boolean) => Promise<void>
+  /** Host only: removes another player from the room. */
+  kickPlayer: (playerId: string) => Promise<void>
   startBattle: () => Promise<void>
   startSongChallenge: () => Promise<void>
   /** Returns the server verdict, or null when the submission could not be processed. */
@@ -51,6 +64,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   room: null,
   error: null,
   joinError: null,
+  notice: null,
+  kickedFrom: null,
   setRoom: (room) => set({ room }),
   receiveRoom: (room) => {
     if (!get().isCurrentRoom(room.code)) return
@@ -63,6 +78,15 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     return normalized === get().room?.code.toUpperCase() || normalized === pendingJoinCode
   },
   setError: (error) => set({ error }),
+  dismissNotice: () => set({ notice: null }),
+  receiveKick: (roomCode) => {
+    if (!get().isCurrentRoom(roomCode)) return
+    const code = roomCode.toUpperCase()
+    if (pendingJoinCode === code) pendingJoinCode = null
+    get().clear()
+    set({ notice: KICKED_NOTICE, kickedFrom: code })
+  },
+  acknowledgeKick: () => set({ kickedFrom: null }),
   clear: () => {
     useChatStore.getState().clear()
     useWordRaceStore.getState().reset()
@@ -100,7 +124,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       useChatStore.getState().clear()
     }
     pendingJoinCode = code
-    set({ joinError: null })
+    // Joining a room makes an old "removed from the room" notice irrelevant.
+    set({ joinError: null, notice: null, kickedFrom: null })
     try {
       const room = await emitWithAck<Room>('room:join', {
         roomCode: code,
@@ -157,6 +182,22 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         roomCode: room.code,
         playerId: identity.id,
         ready,
+      })
+      get().receiveRoom(updated)
+      set({ error: null })
+    } catch (error) {
+      set({ error: toErrorMessage(error) })
+    }
+  },
+  kickPlayer: async (playerId) => {
+    const { room } = get()
+    const identity = useAuthStore.getState().identity
+    if (!room || !identity) return
+    try {
+      const updated = await emitWithAck<Room>('player:kick', {
+        roomCode: room.code,
+        requesterId: identity.id,
+        playerId,
       })
       get().receiveRoom(updated)
       set({ error: null })
@@ -242,6 +283,7 @@ export function initRoomSync(): void {
   socket.on('chat:message', (message: ChatMessage) => {
     if (useRoomStore.getState().isCurrentRoom(message.roomCode)) useChatStore.getState().addMessage(message)
   })
+  socket.on('room:kicked', (payload: { roomCode: string }) => useRoomStore.getState().receiveKick(payload.roomCode))
   socket.on('error:domain', (error: DomainErrorPayload) => useRoomStore.getState().setError(error.message))
   socket.io.on('reconnect', () => {
     const { room, joinRoom } = useRoomStore.getState()
@@ -252,3 +294,5 @@ export function initRoomSync(): void {
 export const useRoom = () => useRoomStore((state) => state.room)
 export const useRoomError = () => useRoomStore((state) => state.error)
 export const useRoomJoinError = () => useRoomStore((state) => state.joinError)
+export const useRoomNotice = () => useRoomStore((state) => state.notice)
+export const useKickedFrom = () => useRoomStore((state) => state.kickedFrom)

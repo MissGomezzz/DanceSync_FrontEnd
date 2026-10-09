@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { defaultGuestName, useAuthStore } from '../features/auth/store/authStore'
-import { MAX_PLAYERS, MIN_PLAYERS_TO_START, useRoomError, useRoomStore } from '../features/rooms/store/roomStore'
+import {
+  MAX_PLAYERS,
+  MIN_PLAYERS_TO_START,
+  useRoomError,
+  useRoomNotice,
+  useRoomStore,
+} from '../features/rooms/store/roomStore'
 import { Button } from '../shared/ui/atoms/Button'
 import { Input } from '../shared/ui/atoms/Input'
 
@@ -12,6 +18,8 @@ export function HomePage() {
   const createRoom = useRoomStore((state) => state.createRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const roomError = useRoomError()
+  const notice = useRoomNotice()
+  const dismissNotice = useRoomStore((state) => state.dismissNotice)
 
   const [name, setName] = useState(() => identity?.displayName ?? defaultGuestName())
   const [joinCode, setJoinCode] = useState('')
@@ -51,6 +59,18 @@ export function HomePage() {
           {MIN_PLAYERS_TO_START} dancers compete while the spectators watch and vote for the winner.
         </p>
       </header>
+
+      {notice && (
+        <div
+          role="status"
+          className="flex w-full max-w-sm items-center justify-between gap-3 rounded-lg border border-amber-900 bg-amber-950/40 px-4 py-3 text-sm text-amber-200"
+        >
+          <span>{notice}</span>
+          <Button variant="ghost" className="px-2 py-1 text-xs" onClick={dismissNotice}>
+            Dismiss
+          </Button>
+        </div>
+      )}
 
       <div className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-6">
         <Input

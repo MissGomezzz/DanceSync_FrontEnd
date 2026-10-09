@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Room } from '../shared/types'
@@ -53,5 +54,21 @@ describe('HomePage', () => {
       </MemoryRouter>,
     )
     expect(emitWithAck).not.toHaveBeenCalled()
+  })
+
+  it('shows the "removed from the room" notice until it is dismissed', async () => {
+    const user = userEvent.setup()
+    useRoomStore.setState({ room: null, notice: 'The host removed you from the room.' })
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('status').textContent).toContain('The host removed you from the room.')
+    await user.click(screen.getByRole('button', { name: 'Dismiss' }))
+
+    expect(screen.queryByText('The host removed you from the room.')).toBeNull()
+    expect(useRoomStore.getState().notice).toBeNull()
   })
 })

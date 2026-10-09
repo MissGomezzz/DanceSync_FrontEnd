@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Player } from '../../../shared/types'
 import { Badge } from '../../../shared/ui/atoms/Badge'
 import { Button } from '../../../shared/ui/atoms/Button'
@@ -18,6 +19,10 @@ interface RoomLobbyViewProps {
   error: string | null
   onStartBattle: () => void
   onLeave: () => void
+  /** Host only: removes a player after an inline confirmation; absent for everyone else. */
+  onKick?: (playerId: string) => void
+  /** Player whose removal is waiting for the server; every "Remove" is disabled meanwhile. */
+  kickingPlayerId?: string | null
 }
 
 export function RoomLobbyView({
@@ -34,6 +39,8 @@ export function RoomLobbyView({
   error,
   onStartBattle,
   onLeave,
+  onKick,
+  kickingPlayerId = null,
 }: RoomLobbyViewProps) {
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
@@ -53,7 +60,20 @@ export function RoomLobbyView({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Players</h2>
         {players.length === 0 && <p className="text-sm text-slate-500">Joining room...</p>}
         {players.map((player) => (
-          <PlayerCard key={player.id} player={player} isHost={player.id === hostId} />
+          <PlayerCard
+            key={player.id}
+            player={player}
+            isHost={player.id === hostId}
+            actions={
+              isHost && onKick && player.id !== hostId ? (
+                <KickControl
+                  playerName={player.displayName}
+                  pending={kickingPlayerId !== null}
+                  onConfirm={() => onKick(player.id)}
+                />
+              ) : null
+            }
+          />
         ))}
       </div>
 
@@ -88,5 +108,48 @@ export function RoomLobbyView({
         )}
       </footer>
     </section>
+  )
+}
+
+interface KickControlProps {
+  playerName: string
+  pending: boolean
+  onConfirm: () => void
+}
+
+const smallButton = 'px-2 py-1 text-xs'
+
+/** "Remove", then an inline "Confirm" / "Cancel", so a misclick never removes anyone. */
+function KickControl({ playerName, pending, onConfirm }: KickControlProps) {
+  const [confirming, setConfirming] = useState(false)
+
+  if (!confirming) {
+    return (
+      <Button
+        variant="ghost"
+        className={smallButton}
+        // The name starts with the visible label, so voice control still matches "Remove".
+        aria-label={`Remove ${playerName}`}
+        disabled={pending}
+        onClick={() => setConfirming(true)}
+      >
+        Remove
+      </Button>
+    )
+  }
+  return (
+    <span className="flex items-center gap-1">
+      <Button
+        className={smallButton}
+        aria-label={pending ? `Removing ${playerName}` : `Confirm removing ${playerName}`}
+        disabled={pending}
+        onClick={onConfirm}
+      >
+        {pending ? 'Removing...' : 'Confirm'}
+      </Button>
+      <Button variant="ghost" className={smallButton} disabled={pending} onClick={() => setConfirming(false)}>
+        Cancel
+      </Button>
+    </span>
   )
 }

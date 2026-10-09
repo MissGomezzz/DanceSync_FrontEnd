@@ -6,6 +6,7 @@ import { ConnectionBanner } from '../../../shared/ui/molecules/ConnectionBanner'
 import { CameraPermissionPrompt } from '../../camera/components/CameraPermissionPrompt'
 import { useBattleVideo } from '../../camera/hooks/useBattleVideo'
 import { RoomUnavailableView } from '../../rooms/components/RoomUnavailableView'
+import { useKickedRedirect } from '../../rooms/hooks/useKickedRedirect'
 import { useRoom, useRoomError, useRoomJoinError, useRoomStore } from '../../rooms/store/roomStore'
 import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
 import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
@@ -30,6 +31,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const connection = useConnectionStatus()
   // Bound before the (re)join below, so a word already on screen is not missed.
   useWordRaceSync(roomCode)
+  useKickedRedirect(roomCode)
 
   // An error left by the lobby (for example a failed song pick) must not show up here.
   useEffect(() => setError(null), [roomCode, setError])
