@@ -115,6 +115,12 @@ export interface Battle {
    * Preferred over `startedAt` (no clock skew); absent on older servers.
    */
   startsInMs?: number
+  /**
+   * Time left, when the server emitted this room, until it finishes the battle on
+   * its own (end of the song plus the rating grace period). Null when there is no
+   * such deadline; absent on older servers.
+   */
+  endsInMs?: number | null
   finishedAt: string | null
   /**
    * Null when the battle finished without a rating result: too few dancers left,

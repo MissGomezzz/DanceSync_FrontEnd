@@ -5,6 +5,10 @@ interface RatingPanelViewProps {
   maxStars: number
   /** Only spectators may rate; dancers see a read-only note. */
   canRate: boolean
+  /** Rating is not possible right now (the battle has not started, or ratings closed). */
+  locked?: boolean
+  /** "The battle starts in Ns", "Ratings close in Ns"...; null when the server sent no timing. */
+  timing?: string | null
   scoreFor: (dancerId: string) => number
   isRated: (dancerId: string) => boolean
   pendingDancerId: string | null
@@ -16,6 +20,8 @@ export function RatingPanelView({
   dancers,
   maxStars,
   canRate,
+  locked = false,
+  timing = null,
   scoreFor,
   isRated,
   pendingDancerId,
@@ -26,12 +32,16 @@ export function RatingPanelView({
     <section className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Rate the dancers</h2>
 
+      {timing && (
+        <p className="text-sm font-medium text-amber-300">{timing}</p>
+      )}
+
       {!canRate && <p className="text-sm text-slate-500">Only spectators can rate the dancers.</p>}
 
       {canRate &&
         dancers.map((dancer) => {
           const rated = isRated(dancer.id)
-          const disabled = rated || pendingDancerId !== null
+          const disabled = locked || rated || pendingDancerId !== null
           return (
             <div key={dancer.id} className="flex items-center justify-between gap-3">
               <span className="text-sm">{dancer.displayName}</span>
