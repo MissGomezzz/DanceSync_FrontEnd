@@ -10,6 +10,7 @@ import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
 import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
 import { useWordRaceWins } from '../../wordRace/store/wordRaceStore'
 import { BattleStageView } from './BattleStageView'
+import { SongPlayer } from '../../songSelection/components/SongPlayer'
 
 interface BattleStageProps {
   roomCode: string
@@ -53,9 +54,21 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   if (!inRoom && joinError) {
     return <RoomUnavailableView roomCode={roomCode} reason={joinError} onBack={() => navigate('/home')} />
   }
+  const song = inRoom ? room.battle?.song : null
+  const songVideo =
+  inRoom && room.status === 'battling' && room.battle && song?.youtubeId ? (
+    <SongPlayer
+      videoId={song.youtubeId}
+      startAt={Date.parse(room.battle.startedAt)}
+      onError={(code) =>
+        setError(code === 101 || code === 150 ? 'This song video cannot be embedded.' : 'The song video could not be loaded.')
+      }
+    />
+  ) : null
 
   return (
     <BattleStageView
+      songVideo={songVideo}
       roomCode={roomCode}
       room={inRoom ? room : null}
       error={error}

@@ -20,6 +20,7 @@ interface BattleStageViewProps {
   /** Word race rounds won per dancer id; a dancer without an entry shows no tally. */
   wordWins: Record<string, number>
   onLeave: () => void
+  songVideo?: ReactNode
 }
 
 const statusLabels: Record<RoomStatus, string> = {
