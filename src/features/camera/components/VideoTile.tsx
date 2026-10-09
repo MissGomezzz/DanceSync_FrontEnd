@@ -31,7 +31,7 @@ export function VideoTile({ stream, label, mirrored = false, placeholder, badges
         <span className="truncate text-lg font-semibold text-slate-100">{label}</span>
         <span className="flex shrink-0 gap-2">{badges}</span>
       </figcaption>
-      <div className="relative aspect-[4/3] bg-slate-950">
+      <div className="relative aspect-video bg-slate-950">
         <video
           ref={videoRef}
           autoPlay

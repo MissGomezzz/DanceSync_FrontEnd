@@ -35,6 +35,7 @@ export interface Song {
   title: string
   artist: string
   durationSeconds: number
+  youtubeId?: string
 }
 
 /** typing: phrase on screen; choosing: the winner picks a song; done: song picked. */
