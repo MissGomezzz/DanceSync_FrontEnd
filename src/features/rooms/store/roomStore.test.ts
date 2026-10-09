@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage, Room } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useChatStore } from '../../chat/store/chatStore'
+import { useVoteStore } from '../../voting/store/voteStore'
 import { useWordRaceStore } from '../../wordRace/store/wordRaceStore'
 import { initRoomSync, useRoomStore } from './roomStore'
 
@@ -159,5 +160,20 @@ describe('a failed rejoin', () => {
     expect(result).toBeNull()
     expect(useRoomStore.getState().room).toBeNull()
     expect(useRoomStore.getState().joinError).toBe('Room not found')
+  })
+})
+
+describe('a room that goes back to the lobby (rematch)', () => {
+  it('resets the vote and the word race of the previous battle, but not on other updates', () => {
+    useRoomStore.setState({ room: room('AAAAAA', { status: 'finished' }) })
+    useVoteStore.getState().receiveMine({ roomCode: 'AAAAAA', dancerId: 'x' })
+    useWordRaceStore.setState({ wins: { x: 2 } })
+
+    serverEmits('room:updated', room('AAAAAA', { status: 'finished' }))
+    expect(useVoteStore.getState().dancerId).toBe('x')
+
+    serverEmits('room:updated', room('AAAAAA', { status: 'waiting' }))
+    expect(useVoteStore.getState().dancerId).toBeNull()
+    expect(useWordRaceStore.getState().wins).toEqual({})
   })
 })

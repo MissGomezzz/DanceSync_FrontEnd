@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useServerTime } from '../../../shared/hooks/useCountdown'
 import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
@@ -32,6 +32,8 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const joinRoom = useRoomStore((state) => state.joinRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const setError = useRoomStore((state) => state.setError)
+  const rematch = useRoomStore((state) => state.rematch)
+  const [rematching, setRematching] = useState(false)
   const myId = useAuthStore((state) => state.identity?.id ?? null)
   const { dancerVideos, needsCameraPrompt } = useBattleVideo(roomCode)
   const wordWins = useWordRaceWins()
@@ -50,6 +52,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   }, [roomCode, joinRoom])
 
   useEffect(() => {
+    // Back in the lobby: a rematch (or a room that was reset while away).
     if (room?.code === roomCode && room.status === 'waiting') {
       navigate(`/rooms/${roomCode}`, { replace: true })
     }
@@ -59,6 +62,18 @@ export function BattleStage({ roomCode }: BattleStageProps) {
     // Best effort, see RoomLobby: never wait for the server to leave the page.
     void leaveRoom()
     navigate('/home', { replace: true })
+  }
+
+  const handleRematch = async () => {
+    // One request at a time: a double click must not send two rematches.
+    if (rematching) return
+    setRematching(true)
+    try {
+      // On success the room comes back "waiting" and the effect above opens the lobby.
+      await rematch()
+    } finally {
+      setRematching(false)
+    }
   }
 
   const inRoom = room?.code === roomCode
@@ -88,9 +103,18 @@ export function BattleStage({ roomCode }: BattleStageProps) {
         room={room}
         myId={myId}
         actions={
-          <Button variant="ghost" onClick={handleLeave}>
-            Leave room
-          </Button>
+          <>
+            {room.hostId === myId ? (
+              <Button onClick={() => void handleRematch()} disabled={rematching}>
+                {rematching ? 'Starting rematch...' : 'Rematch'}
+              </Button>
+            ) : (
+              <p className="self-center text-sm text-slate-500">The host can start a rematch.</p>
+            )}
+            <Button variant="ghost" onClick={handleLeave}>
+              Leave room
+            </Button>
+          </>
         }
       />
     ) : null

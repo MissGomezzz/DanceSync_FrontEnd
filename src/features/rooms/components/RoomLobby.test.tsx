@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -321,5 +321,44 @@ describe('removing a player', () => {
     expect(useRoomStore.getState().room).toBeNull()
     expect(useRoomStore.getState().notice).toBe('The host removed you from the room.')
     expect(useRoomStore.getState().kickedFrom).toBeNull()
+  })
+})
+
+describe('after a rematch', () => {
+  it('shows the previous battle as a compact "Last battle" card', async () => {
+    const lastResult = {
+      winnerId: 'rival',
+      standings: [
+        { dancerId: 'rival', displayName: 'Rival', votes: 2, wordsWon: 1, score: 5, rank: 1 },
+        { dancerId: 'me', displayName: 'Me', votes: 1, wordsWon: 0, score: 2, rank: 2 },
+      ],
+    }
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby({ lastResult })) })
+    renderLobby()
+
+    const card = await screen.findByRole('region', { name: 'Last battle' })
+    expect(card.textContent).toContain('Winner: Rival')
+    expect(
+      within(within(card).getByRole('list', { name: 'Last battle ranking' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['1stRival5 pts', '2ndMe2 pts'])
+  })
+
+  it('says it was a tie, and shows no card before the first battle', async () => {
+    const tie = {
+      winnerId: null,
+      standings: [
+        { dancerId: 'rival', displayName: 'Rival', votes: 1, wordsWon: 0, score: 2, rank: 1 },
+        { dancerId: 'me', displayName: 'Me', votes: 1, wordsWon: 0, score: 2, rank: 1 },
+      ],
+    }
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findAllByText('Rival')
+    expect(screen.queryByRole('region', { name: 'Last battle' })).toBeNull()
+
+    act(() => useRoomStore.getState().receiveRoom(lobby({ lastResult: tie })))
+    expect(screen.getByRole('region', { name: 'Last battle' }).textContent).toContain('It was a tie!')
   })
 })

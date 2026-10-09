@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
 import { ConnectionBanner } from '../../../shared/ui/molecules/ConnectionBanner'
 import { useAuthStore } from '../../auth/store/authStore'
+import { LastBattleCardView } from '../../results/components/LastBattleCardView'
 import { SongSelectionPanel } from '../../songSelection/components/SongSelectionPanel'
 import {
   MAX_PLAYERS,
@@ -160,6 +161,11 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
         />
       )}
       {inRoom && <ReadyButton ready={me?.ready === true} pending={readyPending} onToggle={() => void handleToggleReady()} />}
+      {inRoom && room.lastResult?.standings && room.lastResult.standings.length > 0 && (
+        <div className="mx-auto w-full max-w-3xl px-6">
+          <LastBattleCardView standings={room.lastResult.standings} winnerId={room.lastResult.winnerId} />
+        </div>
+      )}
       {inRoom && <SongSelectionPanel room={room} />}
       <RoomLobbyView
         roomCode={roomCode}

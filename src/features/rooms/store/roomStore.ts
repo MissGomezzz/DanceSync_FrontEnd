@@ -4,6 +4,7 @@ import { emitWithAck, socket, SocketDomainError } from '../../../shared/lib/sock
 import type { ChatMessage, DomainErrorPayload, MyVotePayload, Room, SongSubmitOutcome } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useChatStore } from '../../chat/store/chatStore'
+import { useScoreboardStore } from '../../scoreboard/store/scoreboardStore'
 import { useVoteStore } from '../../voting/store/voteStore'
 import { useWordRaceStore } from '../../wordRace/store/wordRaceStore'
 
@@ -11,6 +12,12 @@ export const MAX_PLAYERS = 7
 export const MIN_PLAYERS_TO_START = 2
 
 export const KICKED_NOTICE = 'The host removed you from the room.'
+
+/** Plain-words explanation of each rematch rejection; anything else shows the server's message. */
+export const rematchErrorMessages: Record<string, string> = {
+  NOT_HOST: 'Only the host can start a rematch.',
+  ROOM_NOT_FINISHED: 'The battle is not over yet, so a rematch cannot start.',
+}
 
 interface RoomState {
   room: Room | null
@@ -35,7 +42,7 @@ interface RoomState {
   receiveKick: (roomCode: string) => void
   /** Called once the page of the room the player was removed from has navigated away. */
   acknowledgeKick: () => void
-  /** Drops the room and every room-scoped store (chat, word race, vote). */
+  /** Drops the room and every room-scoped store (chat, word race, vote, score changes). */
   clear: () => void
   createRoom: (displayName: string) => Promise<Room | null>
   joinRoom: (roomCode: string) => Promise<Room | null>
@@ -47,9 +54,23 @@ interface RoomState {
   kickPlayer: (playerId: string) => Promise<void>
   startBattle: () => Promise<void>
   startSongChallenge: () => Promise<void>
+  /** Host only, once the battle finished: takes the same room back to the lobby. */
+  rematch: () => Promise<void>
   /** Returns the server verdict, or null when the submission could not be processed. */
   submitSongPhrase: (text: string) => Promise<SongSubmitOutcome | null>
   chooseSong: (songId: string) => Promise<void>
+}
+
+/**
+ * A room that goes back to the lobby (a rematch) starts a new battle: the word
+ * race, the vote and the score changes of the previous one must not leak into it.
+ */
+function resetBattleStores(previous: Room | null, next: Room): void {
+  const backToLobby = previous !== null && previous.code === next.code && previous.status !== 'waiting'
+  if (!backToLobby || next.status !== 'waiting') return
+  useWordRaceStore.getState().reset()
+  useVoteStore.getState().reset()
+  useScoreboardStore.getState().reset()
 }
 
 function toErrorMessage(error: unknown): string {
@@ -71,7 +92,9 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   receiveRoom: (room) => {
     if (!get().isCurrentRoom(room.code)) return
     // An error from the lobby (or the battle) is stale once the room changes phase.
-    const phaseChanged = get().room?.status !== room.status
+    const previous = get().room
+    const phaseChanged = previous?.status !== room.status
+    resetBattleStores(previous, room)
     set(phaseChanged ? { room, error: null } : { room })
   },
   isCurrentRoom: (code) => {
@@ -92,6 +115,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     useChatStore.getState().clear()
     useWordRaceStore.getState().reset()
     useVoteStore.getState().reset()
+    useScoreboardStore.getState().reset()
     set({ room: null, error: null, joinError: null })
   },
   createRoom: async (displayName) => {
@@ -134,6 +158,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
         playerId: identity.id,
         displayName: identity.displayName,
       })
+      resetBattleStores(get().room, room)
       set({ room, error: null, joinError: null })
       return room
     } catch (error) {
@@ -235,6 +260,22 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       set({ error: null })
     } catch (error) {
       set({ error: toErrorMessage(error) })
+    }
+  },
+  rematch: async () => {
+    const { room } = get()
+    const identity = useAuthStore.getState().identity
+    if (!room || !identity) return
+    try {
+      const updated = await emitWithAck<Room>('room:rematch', {
+        roomCode: room.code,
+        requesterId: identity.id,
+      })
+      get().receiveRoom(updated)
+      set({ error: null })
+    } catch (error) {
+      const known = error instanceof SocketDomainError ? rematchErrorMessages[error.code] : undefined
+      set({ error: known ?? toErrorMessage(error) })
     }
   },
   submitSongPhrase: async (text) => {
