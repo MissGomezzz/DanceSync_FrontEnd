@@ -1,7 +1,7 @@
 import { Navigate, useParams } from 'react-router'
 import { useRoom } from '../../rooms/store/roomStore'
 import { ChatPanel } from '../../chat/components/ChatPanel'
-import { RatingPanel } from '../../rating/components/RatingPanel'
+import { VotePanel } from '../../voting/components/VotePanel'
 import { BattleStage } from '../components/BattleStage'
 
 export function BattlePage() {
@@ -13,14 +13,14 @@ export function BattlePage() {
   }
 
   const code = roomCode.toUpperCase()
-  const showRating = room?.code === code && room.status === 'battling'
+  const inBattle = room?.code === code && room.battle !== null && room.status !== 'waiting'
 
   return (
     <main className="grid min-h-screen gap-6 p-6 lg:grid-cols-[1fr_20rem]">
       <BattleStage roomCode={code} />
       <aside className="flex flex-col gap-6">
+        {inBattle && <VotePanel />}
         <ChatPanel roomCode={code} />
-        {showRating && <RatingPanel />}
       </aside>
     </main>
   )

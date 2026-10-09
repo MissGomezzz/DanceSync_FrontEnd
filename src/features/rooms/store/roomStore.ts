@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import { httpClient } from '../../../shared/api/httpClient'
 import { emitWithAck, socket, SocketDomainError } from '../../../shared/lib/socket'
-import type { ChatMessage, DomainErrorPayload, Room, SongSubmitOutcome } from '../../../shared/types'
+import type { ChatMessage, DomainErrorPayload, MyVotePayload, Room, SongSubmitOutcome } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useChatStore } from '../../chat/store/chatStore'
+import { useVoteStore } from '../../voting/store/voteStore'
 import { useWordRaceStore } from '../../wordRace/store/wordRaceStore'
 
 export const MAX_PLAYERS = 7
@@ -34,7 +35,7 @@ interface RoomState {
   receiveKick: (roomCode: string) => void
   /** Called once the page of the room the player was removed from has navigated away. */
   acknowledgeKick: () => void
-  /** Drops the room and every room-scoped store (chat, word race). */
+  /** Drops the room and every room-scoped store (chat, word race, vote). */
   clear: () => void
   createRoom: (displayName: string) => Promise<Room | null>
   joinRoom: (roomCode: string) => Promise<Room | null>
@@ -90,6 +91,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   clear: () => {
     useChatStore.getState().clear()
     useWordRaceStore.getState().reset()
+    useVoteStore.getState().reset()
     set({ room: null, error: null, joinError: null })
   },
   createRoom: async (displayName) => {
@@ -282,6 +284,10 @@ export function initRoomSync(): void {
   socket.on('battle:finished', applyRoom)
   socket.on('chat:message', (message: ChatMessage) => {
     if (useRoomStore.getState().isCurrentRoom(message.roomCode)) useChatStore.getState().addMessage(message)
+  })
+  // Only the voter receives their own vote (on their private channel), after each change and on rejoin.
+  socket.on('vote:mine', (payload: MyVotePayload) => {
+    if (useRoomStore.getState().isCurrentRoom(payload.roomCode)) useVoteStore.getState().receiveMine(payload)
   })
   socket.on('room:kicked', (payload: { roomCode: string }) => useRoomStore.getState().receiveKick(payload.roomCode))
   socket.on('error:domain', (error: DomainErrorPayload) => useRoomStore.getState().setError(error.message))

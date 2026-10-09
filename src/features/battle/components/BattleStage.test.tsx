@@ -46,7 +46,6 @@ function battlingRoom(battle: Partial<Battle>): Room {
       roomCode: 'ROOM01',
       dancerIds: ['me', 'rival'],
       song: { id: 's1', title: 'Song', artist: 'Artist', durationSeconds: 120, youtubeId: 'yt1' },
-      ratings: [],
       startedAt: new Date(Date.now() - SKEW_MS - 30_000).toISOString(),
       finishedAt: null,
       result: null,

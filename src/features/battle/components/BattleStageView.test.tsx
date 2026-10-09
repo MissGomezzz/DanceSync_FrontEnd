@@ -24,7 +24,6 @@ function roomWith(battle: Partial<NonNullable<Room['battle']>>, status: Room['st
       roomCode: 'ROOM01',
       dancerIds: ['a', 'b'],
       song: null,
-      ratings: [],
       startedAt: '2026-01-01T00:00:00.000Z',
       finishedAt: null,
       result: null,

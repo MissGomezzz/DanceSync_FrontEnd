@@ -47,7 +47,6 @@ const room: Room = {
     roomCode: 'ROOM01',
     dancerIds: ['me', 'rival'],
     song: null,
-    ratings: [],
     startedAt: NOW,
     finishedAt: null,
     result: null,

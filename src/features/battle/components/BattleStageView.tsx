@@ -178,7 +178,7 @@ function ResultPanel({ room }: { room: Room }) {
     )
   }
 
-  const { rows, nameOf } = resultRows(room, result.scores)
+  const { rows, nameOf } = resultRows(room, result.scores ?? {})
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">

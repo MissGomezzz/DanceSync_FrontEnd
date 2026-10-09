@@ -15,19 +15,32 @@ export interface Player {
   ready?: boolean
 }
 
-export interface Rating {
-  raterId: string
+/**
+ * One dancer's line in the ranking, computed by the server:
+ * `score = VOTE_POINTS x votes + WORD_BONUS_POINTS x wordsWon` (2 and 1 by default).
+ */
+export interface Standing {
   dancerId: string
-  /** Integer score in the range 1 to 5. */
+  displayName: string
+  /** Spectators currently voting for this dancer. */
+  votes: number
+  /** Word race rounds this dancer won. */
+  wordsWon: number
   score: number
-  submittedAt: string
+  /** Competition ranking: equal scores share a rank (1, 1, 3). */
+  rank: number
 }
 
+/** Why the battle finished: the song clip ended, or fewer than two dancers were left. */
+export type BattleEndReason = 'song-end' | 'not-enough-dancers'
+
 export interface BattleResult {
-  /** Total score per dancer id: the spectators' ratings plus the word race bonus. */
-  scores: Record<string, number>
-  /** Winning dancer id, or null on a tie. */
+  /** Final ranking, sorted by rank. Absent on servers that predate live scoring. */
+  standings?: Standing[]
+  /** Winning dancer id, or null on a draw (a tie at the top). */
   winnerId: string | null
+  /** Total score per dancer id; only sent by servers that predate `standings`. */
+  scores?: Record<string, number>
 }
 
 export interface Song {
@@ -100,13 +113,22 @@ export interface Battle {
    * result can still name them. Absent on older servers.
    */
   roster?: BattleDancer[]
-  /** Every rating submitted, including those for a dancer who left (excluded from the result). */
-  ratings: Rating[]
   /**
-   * Bonus points per dancer id for word race words typed first; added to the
-   * ratings in the final result. Absent on servers that predate the bonus.
+   * Live ranking, sorted by rank, recomputed on every vote and word race win.
+   * Absent on servers that predate live scoring.
+   */
+  standings?: Standing[]
+  /** Votes per dancer id (totals only: who voted for whom never leaves the server). */
+  voteCounts?: Record<string, number>
+  /** Word race rounds won per dancer id. */
+  wordsWon?: Record<string, number>
+  /**
+   * Older name of `wordsWon`, sent by servers that predate live scoring; read
+   * only as a fallback.
    */
   bonusPoints?: Record<string, number>
+  /** Why the battle finished; null while it runs, absent on older servers. */
+  endReason?: BattleEndReason | null
   /** Absolute start of the battle (and of the song); only a fallback, it depends on clocks agreeing. */
   startedAt: string
   /**
@@ -117,15 +139,12 @@ export interface Battle {
   startsInMs?: number
   /**
    * Time left, when the server emitted this room, until it finishes the battle on
-   * its own (end of the song plus the rating grace period). Null when there is no
-   * such deadline; absent on older servers.
+   * its own at the end of the song. Null when there is no such deadline; absent
+   * on older servers.
    */
   endsInMs?: number | null
   finishedAt: string | null
-  /**
-   * Null when the battle finished without a rating result: too few dancers left,
-   * or the song ended before the ratings were in.
-   */
+  /** Final result once the battle finished; null while it runs. */
   result: BattleResult | null
 }
 
@@ -140,6 +159,11 @@ export interface Room {
   songSelection: SongSelection | null
   selectedSong: Song | null
   createdAt: string
+  /**
+   * Result of the previous battle, kept after a rematch so the lobby can show
+   * it as "Last battle". Absent on older servers.
+   */
+  lastResult?: BattleResult | null
   /** Server-side optimistic concurrency counter; not used by the UI. */
   version?: number
 }
@@ -154,7 +178,16 @@ export interface ChatMessage {
 }
 
 export interface DomainErrorPayload {
-  /** For example ROOM_NOT_FOUND, ROOM_NOT_WAITING, INVALID_PLAYER (bad join input) or TIMEOUT (client-side). */
+  /**
+   * For example ROOM_NOT_FOUND, ROOM_NOT_WAITING, INVALID_PLAYER (bad join input),
+   * INVALID_VOTER, BATTLE_FINISHED, NOT_HOST, ROOM_NOT_FINISHED or TIMEOUT (client-side).
+   */
   code: string
   message: string
+}
+/** Payload of `vote:mine`: the spectator's own vote, sent only to them. */
+export interface MyVotePayload {
+  roomCode: string
+  /** Dancer the spectator votes for, or null when they have no vote. */
+  dancerId: string | null
 }

@@ -39,7 +39,6 @@ function battleRoom(): Room {
       roomCode: 'ROOM01',
       dancerIds: dancers.map((d) => d.id),
       song: null,
-      ratings: [],
       startedAt: NOW,
       finishedAt: null,
       result: null,
