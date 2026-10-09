@@ -87,8 +87,11 @@ export function useBattleVideo(roomCode: string): BattleVideo {
 
   const dancerVideos = dancerList.map(toVideo)
 
+  // Asking for the camera only makes sense while there is still dancing to do;
+  // a finished battle keeps showing the streams but never prompts again.
+  const battling = room?.status === 'battling'
   return {
     dancerVideos,
-    needsCameraPrompt: waitingForMyCamera || (isDancer && cameraStatus !== 'granted'),
+    needsCameraPrompt: battling && (waitingForMyCamera || (isDancer && cameraStatus !== 'granted')),
   }
 }

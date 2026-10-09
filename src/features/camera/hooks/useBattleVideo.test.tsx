@@ -98,6 +98,19 @@ describe('useBattleVideo', () => {
     expect(createPeerSession).toHaveBeenCalledWith(expect.objectContaining({ myId: 'b', isDancer: true, localStream: mine }))
   })
 
+  it('prompts a dancer without camera only while the battle is running', () => {
+    useAuthStore.setState({ identity: { id: 'b', displayName: 'B' } })
+    useCameraStore.setState({ localStream: null, status: 'prompt' })
+    const { result, rerender } = renderHook(() => useBattleVideo('ROOM01'))
+    expect(result.current.needsCameraPrompt).toBe(true)
+
+    act(() => {
+      useRoomStore.setState({ room: { ...battleRoom(), status: 'finished', battle: { ...battleRoom().battle!, finishedAt: NOW } } })
+    })
+    rerender()
+    expect(result.current.needsCameraPrompt).toBe(false)
+  })
+
   it('is empty before the battle starts', () => {
     useAuthStore.setState({ identity: { id: 'fan', displayName: 'FAN' } })
     useRoomStore.setState({ room: { ...battleRoom(), status: 'waiting', dancers: null, battle: null } })
