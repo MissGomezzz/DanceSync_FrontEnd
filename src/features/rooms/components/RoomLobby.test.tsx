@@ -140,6 +140,8 @@ describe('marking yourself ready', () => {
 
     const button = screen.getByRole('button', { name: "I'm ready" })
     expect(button.getAttribute('aria-pressed')).toBe('false')
+    // Everyone, spectators included, must be ready: the copy is not about dancing.
+    expect(screen.getByText('Mark yourself ready when you are ready to start.')).toBeTruthy()
 
     await user.click(button)
     expect(emitWithAck).toHaveBeenCalledWith('player:ready', { roomCode: 'ROOM01', playerId: 'me', ready: true })
@@ -157,7 +159,8 @@ describe('marking yourself ready', () => {
     )
 
     expect(button.getAttribute('aria-pressed')).toBe('true')
-    expect(button.textContent).toBe('Ready - click to cancel')
+    // The label stays put; only the pressed state tells it apart.
+    expect(screen.getByRole('button', { name: "I'm ready" })).toBe(button)
     expect(button).toHaveProperty('disabled', false)
     expect(screen.getAllByText('Ready').length).toBeGreaterThan(0)
 
@@ -166,7 +169,7 @@ describe('marking yourself ready', () => {
     await act(async () => answerReady(lobby()))
 
     expect(button.getAttribute('aria-pressed')).toBe('false')
-    expect(button.textContent).toBe("I'm ready")
+    expect(screen.getByRole('button', { name: "I'm ready" })).toBe(button)
     expect(screen.queryByText('Ready')).toBeNull()
   })
 
