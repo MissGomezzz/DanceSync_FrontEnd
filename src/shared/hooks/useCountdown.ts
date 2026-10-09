@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 
 const TICK_MS = 100
 
+/** Monotonic local clock; never compared with the server's wall clock. */
+const readClock = () => performance.now()
+
 /**
  * Milliseconds left until `deadline` (a performance.now() timestamp), refreshed
  * every 100 ms. Deadlines come from the server's relative "time left" values
@@ -9,12 +12,19 @@ const TICK_MS = 100
  * clock with the server's.
  */
 export function useCountdown(deadline: number | null): number {
-  const [now, setNow] = useState(() => performance.now())
+  const [tick, setTick] = useState(() => ({ deadline, now: readClock() }))
+
+  let now = tick.now
+  if (tick.deadline !== deadline) {
+    // A new deadline reads the clock during render (React's "adjusting state when
+    // a prop changes"), so its first frame never shows a value from a stale tick.
+    now = readClock()
+    setTick({ deadline, now })
+  }
 
   useEffect(() => {
     if (deadline === null) return
-    setNow(performance.now())
-    const id = setInterval(() => setNow(performance.now()), TICK_MS)
+    const id = setInterval(() => setTick({ deadline, now: readClock() }), TICK_MS)
     return () => clearInterval(id)
   }, [deadline])
 

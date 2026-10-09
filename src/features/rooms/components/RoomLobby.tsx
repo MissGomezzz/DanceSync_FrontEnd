@@ -36,7 +36,6 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const myId = useAuthStore((state) => state.identity?.id)
   const connection = useConnectionStatus()
 
-  const [joining, setJoining] = useState(true)
   const [rolePending, setRolePending] = useState(false)
   const [readyPending, setReadyPending] = useState(false)
   const [startingBattle, setStartingBattle] = useState(false)
@@ -45,11 +44,14 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   useEffect(() => setError(null), [roomCode, setError])
   // Bumped by "Try again" to rerun the join effect.
   const [joinAttempt, setJoinAttempt] = useState(0)
+  // The join (room code + attempt) that last settled; any other one is still in flight.
+  const joinKey = `${roomCode}#${joinAttempt}`
+  const [settledJoinKey, setSettledJoinKey] = useState<string | null>(null)
+  const joining = settledJoinKey !== joinKey
 
   useEffect(() => {
-    setJoining(true)
-    void joinRoom(roomCode).finally(() => setJoining(false))
-  }, [roomCode, joinRoom, joinAttempt])
+    void joinRoom(roomCode).finally(() => setSettledJoinKey(joinKey))
+  }, [roomCode, joinRoom, joinKey])
 
   useEffect(() => {
     if (room?.code === roomCode && room.status !== 'waiting') {
