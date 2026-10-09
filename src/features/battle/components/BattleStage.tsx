@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
+import { useServerTime } from '../../../shared/hooks/useCountdown'
 import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
 import { ConnectionBanner } from '../../../shared/ui/molecules/ConnectionBanner'
 import { CameraPermissionPrompt } from '../../camera/components/CameraPermissionPrompt'
@@ -9,8 +10,8 @@ import { useRoom, useRoomError, useRoomJoinError, useRoomStore } from '../../roo
 import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
 import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
 import { useWordRaceWins } from '../../wordRace/store/wordRaceStore'
+import { SongPlayer, YOUTUBE_API_UNAVAILABLE } from '../../songSelection/components/SongPlayer'
 import { BattleStageView } from './BattleStageView'
-import { SongPlayer } from '../../songSelection/components/SongPlayer'
 
 interface BattleStageProps {
   roomCode: string
@@ -51,20 +52,25 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   }
 
   const inRoom = room?.code === roomCode
+  const battle = inRoom ? room.battle : null
+  // Anchored on the local monotonic clock when each room payload arrives, so the
+  // song starts in sync even when this device's wall clock is off.
+  const songStartAt = useServerTime(battle?.startsInMs, battle, battle?.startedAt ?? null)
+
   if (!inRoom && joinError) {
     return <RoomUnavailableView roomCode={roomCode} reason={joinError} onBack={() => navigate('/home')} />
   }
-  const song = inRoom ? room.battle?.song : null
+  const song = battle?.song ?? null
   const songVideo =
-  inRoom && room.status === 'battling' && room.battle && song?.youtubeId ? (
-    <SongPlayer
-      videoId={song.youtubeId}
-      startAt={Date.parse(room.battle.startedAt)}
-      onError={(code) =>
-        setError(code === 101 || code === 150 ? 'This song video cannot be embedded.' : 'The song video could not be loaded.')
-      }
-    />
-  ) : null
+    inRoom && room.status === 'battling' && song?.youtubeId ? (
+      <SongPlayer
+        videoId={song.youtubeId}
+        startAt={songStartAt}
+        // The song's duration is the length of the battle clip.
+        durationSeconds={song.durationSeconds}
+        onError={(code) => setError(songErrorMessage(code))}
+      />
+    ) : null
 
   return (
     <BattleStageView
@@ -80,4 +86,10 @@ export function BattleStage({ roomCode }: BattleStageProps) {
       onLeave={handleLeave}
     />
   )
+}
+
+function songErrorMessage(code: number): string {
+  if (code === 101 || code === 150) return 'This song video cannot be embedded.'
+  if (code === YOUTUBE_API_UNAVAILABLE) return 'The song video could not be loaded. Check your connection.'
+  return 'The song video could not be loaded.'
 }

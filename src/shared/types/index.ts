@@ -96,7 +96,14 @@ export interface Battle {
    * ratings in the final result. Absent on servers that predate the bonus.
    */
   bonusPoints?: Record<string, number>
+  /** Absolute start of the battle (and of the song); only a fallback, it depends on clocks agreeing. */
   startedAt: string
+  /**
+   * `startedAt` minus the server's clock when it emitted this room: positive while
+   * the battle is about to start, negative (elapsed time) once it is running.
+   * Preferred over `startedAt` (no clock skew); absent on older servers.
+   */
+  startsInMs?: number
   finishedAt: string | null
   /**
    * Null when the battle finished without a rating result: too few dancers left,

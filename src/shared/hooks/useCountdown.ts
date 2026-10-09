@@ -44,26 +44,58 @@ export function useServerDeadline(
   payload: unknown,
   fallbackExpiresAt: string | null = null,
 ): number | null {
-  const [state, setState] = useState(() => ({
-    payload,
-    deadline: toDeadline(remainingMs, fallbackExpiresAt),
-  }))
+  const instant = useServerInstant(remainingMs, payload, fallbackExpiresAt)
+  // A deadline that already passed is "now": the countdown shows zero, never a negative value.
+  return instant === null ? null : Math.max(instant.at, instant.receivedAt)
+}
+
+/**
+ * Like useServerDeadline, but for a moment that may already be in the past:
+ * `offsetMs` is "that moment minus the server's now" when the payload was
+ * emitted, so a negative value means it happened |offsetMs| ago (for example the
+ * start of a battle that is already running). Returns the performance.now()
+ * timestamp of that moment, or null when neither value is known.
+ *
+ * `fallbackAt` (an absolute ISO date) is only used when `offsetMs` is absent.
+ */
+export function useServerTime(
+  offsetMs: number | null | undefined,
+  payload: unknown,
+  fallbackAt: string | null = null,
+): number | null {
+  return useServerInstant(offsetMs, payload, fallbackAt)?.at ?? null
+}
+
+interface ServerInstant {
+  /** performance.now() timestamp of the server moment. */
+  at: number
+  /** performance.now() when the payload that carried it was received. */
+  receivedAt: number
+}
+
+function useServerInstant(
+  offsetMs: number | null | undefined,
+  payload: unknown,
+  fallbackAt: string | null,
+): ServerInstant | null {
+  const [state, setState] = useState(() => ({ payload, instant: toInstant(offsetMs, fallbackAt) }))
 
   if (state.payload !== payload) {
     // Derived during render (React's "adjusting state when a prop changes"), so the
-    // first frame after a payload already counts down from the fresh value.
-    const next = { payload, deadline: toDeadline(remainingMs, fallbackExpiresAt) }
+    // first frame after a payload already uses the fresh value.
+    const next = { payload, instant: toInstant(offsetMs, fallbackAt) }
     setState(next)
-    return next.deadline
+    return next.instant
   }
-  return state.deadline
+  return state.instant
 }
 
-function toDeadline(remainingMs: number | null | undefined, fallbackExpiresAt: string | null): number | null {
-  if (typeof remainingMs === 'number') return performance.now() + Math.max(0, remainingMs)
-  if (fallbackExpiresAt) {
-    const expiresAt = Date.parse(fallbackExpiresAt)
-    if (!Number.isNaN(expiresAt)) return performance.now() + Math.max(0, expiresAt - Date.now())
+function toInstant(offsetMs: number | null | undefined, fallbackAt: string | null): ServerInstant | null {
+  const receivedAt = readClock()
+  if (typeof offsetMs === 'number' && Number.isFinite(offsetMs)) return { at: receivedAt + offsetMs, receivedAt }
+  if (fallbackAt) {
+    const at = Date.parse(fallbackAt)
+    if (!Number.isNaN(at)) return { at: receivedAt + (at - Date.now()), receivedAt }
   }
   return null
 }
