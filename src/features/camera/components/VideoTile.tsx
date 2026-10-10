@@ -45,7 +45,7 @@ export function VideoTile({ stream, label, mirrored = false, placeholder, badges
           ))}
         {/* Drawn over the video: a dark pill and a text shadow keep the name readable on any picture.
             It lets clicks through, so the camera prompt underneath stays usable. */}
-        <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 bg-linear-to-t from-black/70 to-transparent p-3">
+        <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 z-(--layer-tile-tags) flex items-end justify-between gap-2 bg-linear-to-t from-black/70 to-transparent p-3">
           <span className="truncate rounded-md bg-black/60 px-2 py-0.5 text-lg font-semibold text-white backdrop-blur-sm [text-shadow:0_1px_3px_rgb(0_0_0/0.9)]">
             {label}
           </span>

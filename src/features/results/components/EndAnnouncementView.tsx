@@ -21,7 +21,7 @@ export function EndAnnouncementView({ outcome, endReason, onDismiss }: EndAnnoun
       aria-modal="true"
       aria-labelledby="battle-over-title"
       onKeyDown={handleKeyDown}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-(--layer-overlay) flex items-center justify-center bg-slate-950/85 p-6 backdrop-blur-sm"
     >
       <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl border border-amber-400/50 bg-slate-900 px-8 py-10 text-center shadow-2xl">
         <h2 id="battle-over-title" className="text-4xl font-extrabold tracking-tight text-amber-300">

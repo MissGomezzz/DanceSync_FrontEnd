@@ -5,10 +5,71 @@
   --color-brand-red-light: #b8262a;
   --color-brand-navy: #0e3c4b;
   --color-brand-navy-light: #1c5a70;
+
+  /* Entrance of full-screen layers and their cards. */
+  --animate-fade-in: fade-in 150ms ease-out both;
+  --animate-overlay-in: overlay-in 200ms ease-out both;
+  /* Non-modal banners sliding in from the top of the stage. */
+  --animate-banner-in: banner-in 200ms ease-out both;
+  /* One numeral of the start countdown popping in. */
+  --animate-count-pop: count-pop 600ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes overlay-in {
+    from {
+      opacity: 0;
+      transform: scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes banner-in {
+    from {
+      opacity: 0;
+      transform: translateY(-0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes count-pop {
+    from {
+      opacity: 0;
+      transform: scale(1.4);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
 }
 
 :root {
   color-scheme: dark;
+
+  /*
+   * Stacking scale, used as z-(--layer-*). Anything drawn over the page picks a
+   * named layer instead of a raw number, so a tile's name tags can never cover
+   * the word race again.
+   */
+  --layer-tile-tags: 10;
+  --layer-header: 20;
+  --layer-banner: 30;
+  --layer-overlay: 40;
+  --layer-countdown: 50;
 }
 
 body {
