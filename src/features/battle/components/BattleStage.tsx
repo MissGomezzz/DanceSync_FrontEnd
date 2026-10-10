@@ -20,6 +20,7 @@ import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
 import { useWordRaceWins } from '../../wordRace/store/wordRaceStore'
 import { SongPlayer, YOUTUBE_API_UNAVAILABLE } from '../../songSelection/components/SongPlayer'
 import { BattleStageView } from './BattleStageView'
+import { StartCountdown } from './StartCountdown'
 
 interface BattleStageProps {
   roomCode: string
@@ -133,6 +134,8 @@ export function BattleStage({ roomCode }: BattleStageProps) {
         onLeave={handleLeave}
         results={results}
       />
+      {/* Same start instant as the song player, so "Dance!" lands on the first beat. */}
+      <StartCountdown battle={inRoom && room.status === 'battling' ? battle : null} startAt={songStartAt} />
       <EndAnnouncement room={inRoom ? room : null} />
     </>
   )
