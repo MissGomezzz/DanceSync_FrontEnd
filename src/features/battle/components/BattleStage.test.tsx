@@ -123,3 +123,31 @@ describe('BattleStage song lifecycle (HU 15)', () => {
     expect(screen.getAllByRole('button', { name: 'Leave room' })).toHaveLength(1)
   })
 })
+
+describe('BattleStage song video errors', () => {
+  it('shows a calm notice in the song area when the video cannot be embedded', async () => {
+    useRoomStore.setState({ error: null })
+    await renderWith(battlingRoom({ startsInMs: -1_000 }))
+    const props = songPlayer.mock.lastCall?.[0] as { onError: (code: number) => void }
+
+    act(() => props.onError(150))
+
+    expect(screen.getByRole('note').textContent).toBe(
+      "This song's video can't be played here. The battle goes on without the music video.",
+    )
+    expect(screen.queryByText('Song video')).toBeNull()
+    // Not the red error banner: the battle keeps going.
+    expect(useRoomStore.getState().error).toBeNull()
+  })
+
+  it('still reports other player failures as an error', async () => {
+    useRoomStore.setState({ error: null })
+    await renderWith(battlingRoom({ startsInMs: -1_000 }))
+    const props = songPlayer.mock.lastCall?.[0] as { onError: (code: number) => void }
+
+    act(() => props.onError(-1))
+
+    expect(useRoomStore.getState().error).toBe('The song video could not be loaded. Check your connection.')
+    expect(screen.queryByRole('note')).toBeNull()
+  })
+})

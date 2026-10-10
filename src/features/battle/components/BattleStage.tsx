@@ -19,6 +19,7 @@ import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
 import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
 import { useWordRaceWins } from '../../wordRace/store/wordRaceStore'
 import { SongPlayer, YOUTUBE_API_UNAVAILABLE } from '../../songSelection/components/SongPlayer'
+import { SongVideoNotice } from '../../songSelection/components/SongVideoNotice'
 import { BattleStageView } from './BattleStageView'
 import { StartCountdown } from './StartCountdown'
 
@@ -36,6 +37,8 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const setError = useRoomStore((state) => state.setError)
   const rematch = useRoomStore((state) => state.rematch)
   const [rematching, setRematching] = useState(false)
+  // YouTube refused to embed this video (errors 101/150); kept per video, so the next song tries again.
+  const [unembeddableVideoId, setUnembeddableVideoId] = useState<string | null>(null)
   const myId = useAuthStore((state) => state.identity?.id ?? null)
   const { dancerVideos, needsCameraPrompt } = useBattleVideo(roomCode)
   const wordWins = useWordRaceWins()
@@ -88,15 +91,25 @@ export function BattleStage({ roomCode }: BattleStageProps) {
     return <RoomUnavailableView roomCode={roomCode} reason={joinError} onBack={() => navigate('/home')} />
   }
   const song = battle?.song ?? null
+  const videoId = inRoom && room.status === 'battling' ? (song?.youtubeId ?? null) : null
+  const handleSongError = (code: number) => {
+    // The battle goes on without the video: a calm notice in the song area, not an error.
+    if (code === 101 || code === 150) setUnembeddableVideoId(videoId)
+    else setError(songErrorMessage(code))
+  }
   const songVideo =
-    inRoom && room.status === 'battling' && song?.youtubeId ? (
-      <SongPlayer
-        videoId={song.youtubeId}
-        startAt={songStartAt}
-        // The song's duration is the length of the battle clip.
-        durationSeconds={song.durationSeconds}
-        onError={(code) => setError(songErrorMessage(code))}
-      />
+    song && videoId ? (
+      videoId === unembeddableVideoId ? (
+        <SongVideoNotice message="This song's video can't be played here. The battle goes on without the music video." />
+      ) : (
+        <SongPlayer
+          videoId={videoId}
+          startAt={songStartAt}
+          // The song's duration is the length of the battle clip.
+          durationSeconds={song.durationSeconds}
+          onError={handleSongError}
+        />
+      )
     ) : null
 
   const results =
@@ -142,7 +155,6 @@ export function BattleStage({ roomCode }: BattleStageProps) {
 }
 
 function songErrorMessage(code: number): string {
-  if (code === 101 || code === 150) return 'This song video cannot be embedded.'
   if (code === YOUTUBE_API_UNAVAILABLE) return 'The song video could not be loaded. Check your connection.'
   return 'The song video could not be loaded.'
 }
