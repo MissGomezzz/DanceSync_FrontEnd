@@ -12,8 +12,14 @@ export const AUTOPLAY_CHECK_MS = 2_000
 const DRIFT_TOLERANCE_S = 1.5
 
 // YT.PlayerState values; the enum object only exists once the API script has loaded.
+const UNSTARTED = -1
+const ENDED = 0
 const PLAYING = 1
+const PAUSED = 2
 const BUFFERING = 3
+const CUED = 5
+/** Pauses this close to the clip end are the planned stop, not something to undo. */
+const END_MARGIN_MS = 500
 
 let apiPromise: Promise<void> | null = null
 
@@ -77,11 +83,20 @@ export function SongPlayer({ videoId, startAt, durationSeconds, onError }: SongP
   const [ready, setReady] = useState(false)
   // The browser refused to start the music without a user gesture.
   const [blocked, setBlocked] = useState(false)
+  // A black curtain hides YouTube's own screens (thumbnail, title, logo, end
+  // screen) whenever the video is not actually playing: players only see the dance.
+  const [showVideo, setShowVideo] = useState(false)
   const onErrorRef = useRef(onError)
+  // Read by the player's event handlers, which are created once per video.
+  const clipRef = useRef({ startAt, durationSeconds })
 
   useEffect(() => {
     onErrorRef.current = onError
   }, [onError])
+
+  useEffect(() => {
+    clipRef.current = { startAt, durationSeconds }
+  }, [startAt, durationSeconds])
 
   useEffect(() => {
     let cancelled = false
@@ -94,11 +109,35 @@ export function SongPlayer({ videoId, startAt, durationSeconds, onError }: SongP
         playerRef.current = new YT.Player(target, {
           host: 'https://www.youtube-nocookie.com',
           videoId,
-          playerVars: { controls: 0, disablekb: 1, rel: 0, playsinline: 1, fs: 0, start: 0, end: durationSeconds },
+          // No controls, keyboard, fullscreen, annotations or related videos:
+          // the battle clock drives playback and players can only watch.
+          playerVars: {
+            controls: 0,
+            disablekb: 1,
+            rel: 0,
+            playsinline: 1,
+            fs: 0,
+            iv_load_policy: 3,
+            start: 0,
+            end: durationSeconds,
+          },
           events: {
             onReady: () => setReady(true),
             onStateChange: (event: YT.OnStateChangeEvent) => {
-              if (event.data === PLAYING) setBlocked(false)
+              if (event.data === PLAYING) {
+                setBlocked(false)
+                setShowVideo(true)
+              } else if (event.data === PAUSED || event.data === ENDED || event.data === UNSTARTED || event.data === CUED) {
+                setShowVideo(false)
+              }
+              // Nobody may pause the dance: a pause during the clip (media keys,
+              // OS media controls) is undone by resyncing to the battle clock.
+              const { startAt: clipStart, durationSeconds: clipSeconds } = clipRef.current
+              const player = playerRef.current
+              if (event.data === PAUSED && player && clipStart !== null) {
+                const now = performance.now()
+                if (now >= clipStart && now < clipStart + clipSeconds * 1000 - END_MARGIN_MS) syncTo(player, clipStart)
+              }
             },
             onAutoplayBlocked: () => setBlocked(true),
             onError: (event: YT.OnErrorEvent) => onErrorRef.current?.(event.data),
@@ -114,6 +153,7 @@ export function SongPlayer({ videoId, startAt, durationSeconds, onError }: SongP
       cancelled = true
       setReady(false)
       setBlocked(false)
+      setShowVideo(false)
       playerRef.current?.destroy()
       playerRef.current = null
       target.remove()
@@ -164,8 +204,11 @@ export function SongPlayer({ videoId, startAt, durationSeconds, onError }: SongP
 
   return (
     <div className="relative aspect-video w-full bg-black">
-      {/* The video is not interactive: the battle clock drives it. */}
+      {/* The video is not interactive: no clicks, hover overlays or fullscreen reach YouTube. */}
       <div ref={hostRef} className="pointer-events-none absolute inset-0 [&_iframe]:h-full [&_iframe]:w-full" />
+      {!showVideo && (
+        <div data-testid="song-curtain" aria-hidden="true" className="absolute inset-0 bg-black" />
+      )}
       {blocked && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 p-4">
           <Button onClick={handleStartMusic}>Tap to start the music</Button>

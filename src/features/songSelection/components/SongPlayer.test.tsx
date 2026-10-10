@@ -116,6 +116,56 @@ describe('SongPlayer timing', () => {
   })
 })
 
+describe('SongPlayer as a watch-only video', () => {
+  const PAUSED = 2
+  const curtain = () => screen.queryByTestId('song-curtain')
+
+  it('hides YouTube behind a curtain until the dance plays, and again when it stops', async () => {
+    vi.useFakeTimers()
+    const { player } = await renderPlayer(performance.now() + 3_000)
+    player.ready()
+    expect(curtain()).not.toBeNull()
+
+    act(() => vi.advanceTimersByTime(3_000))
+    expect(player.state).toBe(PLAYING)
+    expect(curtain()).toBeNull()
+
+    act(() => player.changeState(0))
+    expect(curtain()).not.toBeNull()
+  })
+
+  it('offers no player controls, keyboard, fullscreen or annotations', async () => {
+    const { player, container } = await renderPlayer(null)
+    expect(player.options.playerVars).toMatchObject({ controls: 0, disablekb: 1, fs: 0, iv_load_policy: 3, rel: 0 })
+    expect(container.querySelector('.pointer-events-none')).not.toBeNull()
+  })
+
+  it('undoes a pause during the dance by resyncing to the battle clock', async () => {
+    vi.useFakeTimers()
+    const { player } = await renderPlayer(performance.now() - 20_000)
+    player.ready()
+    player.playVideo.mockClear()
+
+    act(() => player.changeState(PAUSED))
+
+    expect(player.playVideo).toHaveBeenCalledTimes(1)
+    expect(player.state).toBe(PLAYING)
+  })
+
+  it('keeps the planned stop at the end of the clip', async () => {
+    vi.useFakeTimers()
+    const { player } = await renderPlayer(performance.now(), { durationSeconds: 30 })
+    player.ready()
+    act(() => vi.advanceTimersByTime(30_000))
+    expect(player.pauseVideo).toHaveBeenCalled()
+    player.playVideo.mockClear()
+
+    act(() => player.changeState(PAUSED))
+
+    expect(player.playVideo).not.toHaveBeenCalled()
+  })
+})
+
 describe('SongPlayer when the browser blocks autoplay', () => {
   it('offers a button that starts the music at the current elapsed time when playback never starts', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
