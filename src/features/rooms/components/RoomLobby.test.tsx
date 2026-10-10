@@ -93,7 +93,10 @@ describe('leaving the room', () => {
 
     await user.click(screen.getByRole('button', { name: 'Leave room' }))
 
-    expect(screen.getByText('Home page')).toBeTruthy()
+    // The pressed "Leaving…" state shows for a moment (HU 22), then the app goes home
+    // without waiting for the server's answer.
+    expect(screen.getByRole('button', { name: 'Leaving…' })).toBeTruthy()
+    expect(await screen.findByText('Home page')).toBeTruthy()
     expect(emitWithAck).toHaveBeenCalledWith('room:leave', { roomCode: 'ROOM01', playerId: 'me' })
     expect(useRoomStore.getState().room).toBeNull()
   })
