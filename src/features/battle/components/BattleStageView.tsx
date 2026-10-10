@@ -15,7 +15,10 @@ interface BattleStageViewProps {
   dancerVideos: DancerVideo[]
   /** Shown in the local dancer's tile until the camera is on; null otherwise. */
   cameraPrompt: ReactNode
-  /** Word race overlay drawn on top of the dancer tiles. */
+  /**
+   * Word race: a full-screen layer for dancers (portalled to the body) or a
+   * banner pinned to the top of the stage for spectators.
+   */
   wordRace: ReactNode
   /**
    * Word race rounds won per dancer id (the same count the ranking scores); a
@@ -68,6 +71,8 @@ export function BattleStageView({
 
       {results}
 
+      {wordRace}
+
       <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,1fr)]">
         {/* Music video */}
         <div className="min-w-0">
@@ -83,9 +88,7 @@ export function BattleStageView({
         </div>
 
         {/* Dancer cameras */}
-        <div className="relative grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 lg:content-start">
-          {wordRace}
-
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 lg:content-start">
           {dancerVideos.length > 0 ? (
             dancerVideos.map(({ dancer, isMe, stream, placeholder }) => (
               <VideoTile

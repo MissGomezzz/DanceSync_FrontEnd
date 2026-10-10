@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Room } from '../../../shared/types'
@@ -91,7 +91,13 @@ function renderAs(playerId: string) {
   useAuthStore.setState({ identity: { id: playerId, displayName: playerId } })
   useRoomStore.setState({ room, error: null })
   unbind = bindWordRaceSync('ROOM01')
-  return render(<WordRaceOverlay />)
+  // A control outside the overlay, to check where the focus goes and comes back.
+  return render(
+    <>
+      <button type="button">Vote</button>
+      <WordRaceOverlay />
+    </>,
+  )
 }
 
 beforeEach(() => {
@@ -105,14 +111,27 @@ afterEach(() => {
 })
 
 describe('WordRaceOverlay for a dancer', () => {
-  it('shows the word, the round and a focused input', () => {
-    renderAs('me')
-    expect(screen.queryByRole('textbox')).toBeNull()
+  it('opens a full-screen dialog over the page with the word and a focused input', () => {
+    const { container } = renderAs('me')
+    expect(screen.queryByRole('dialog')).toBeNull()
     serverEmits('word:round-started', started)
-    expect(screen.getByTestId('word-race-word').textContent).toBe(WORD)
-    expect(screen.getByText(/Round 2 \/ 3/)).toBeTruthy()
-    expect(screen.getByRole('timer').textContent).toBe('10s')
-    expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Type the word' }))
+
+    const dialog = screen.getByRole('dialog', { name: 'Word 2 of 3' })
+    expect(dialog.getAttribute('aria-modal')).toBe('true')
+    // Portalled to the body, outside the stage and its camera tiles.
+    expect(container.contains(dialog)).toBe(false)
+    expect(document.body.contains(dialog)).toBe(true)
+    expect(within(dialog).getByTestId('word-race-word').textContent).toBe(WORD)
+    expect(within(dialog).getByRole('timer').textContent).toBe('10s')
+    expect(document.activeElement).toBe(within(dialog).getByRole('textbox', { name: 'Type the word' }))
+  })
+
+  it('keeps the dialog open on Escape, since the round is time-boxed', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    renderAs('me')
+    serverEmits('word:round-started', started)
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog')).toBeTruthy()
   })
 
   it('lets the dancer retry after a typo and congratulates the winner', async () => {
@@ -128,12 +147,15 @@ describe('WordRaceOverlay for a dancer', () => {
 
     emitWithAck.mockResolvedValueOnce({ outcome: 'won', winnerId: 'me' })
     await user.clear(input)
+    expect(screen.queryByRole('alert')).toBeNull()
     await user.type(input, `${WORD}{Enter}`)
     serverEmits('word:round-ended', ended({ winnerId: 'me', winnerName: 'Me', wins: { me: 1, rival: 0 } }))
 
-    const banner = screen.getByRole('status')
-    expect(banner.textContent).toBe('You were first! You win this round.')
-    expect(banner.dataset.kind).toBe('won')
+    // The result shows in the same full-screen layer, without the input.
+    const dialog = screen.getByRole('dialog', { name: 'Round over' })
+    const result = within(dialog).getByRole('status')
+    expect(result.textContent).toBe('You were first! You win this round.')
+    expect(result.dataset.kind).toBe('won')
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(useWordRaceStore.getState().wins).toEqual({ me: 1, rival: 0 })
   })
@@ -149,6 +171,7 @@ describe('WordRaceOverlay for a dancer', () => {
     // The winner's broadcast reaches us before the ack of our own (late) submission.
     serverEmits('word:round-ended', ended())
     expect(screen.getByRole('status').textContent).toBe('Too slow! Rival typed it first.')
+    expect(screen.getByRole('status').dataset.kind).toBe('lost')
 
     await act(async () => resolveAck({ outcome: 'late', winnerId: 'rival' }))
     expect(screen.getByRole('status').textContent).toBe('You typed it, but Rival got there first.')
@@ -165,23 +188,32 @@ describe('WordRaceOverlay for a dancer', () => {
     expect(input).toHaveProperty('value', '')
   })
 
-  it('hides the result banner after a few seconds', () => {
+  it('hides the result after a few seconds and gives the focus back', () => {
     renderAs('me')
+    const vote = screen.getByRole('button', { name: 'Vote' })
+    vote.focus()
     serverEmits('word:round-started', started)
+    expect(document.activeElement).toBe(screen.getByRole('textbox'))
+
     serverEmits('word:round-ended', ended({ reason: 'expired', winnerId: null, winnerName: null, wins: { me: 0, rival: 0 } }))
     expect(screen.getByRole('status').textContent).toBe(`Time's up! Nobody typed "${WORD}".`)
+    // No input in the result: the focus stays inside the dialog.
+    expect(screen.getByRole('dialog').contains(document.activeElement)).toBe(true)
+
     act(() => vi.advanceTimersByTime(RESULT_VISIBLE_MS + 100))
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByRole('status')).toBeNull()
+    expect(document.activeElement).toBe(vote)
   })
 
-  it('closes the word card when the battle finishes mid-round', () => {
+  it('closes the word layer when the battle finishes mid-round', () => {
     renderAs('me')
     serverEmits('word:round-started', started)
-    expect(screen.getByRole('textbox')).toBeTruthy()
+    expect(screen.getByRole('dialog')).toBeTruthy()
 
     act(() => useRoomStore.setState({ room: { ...room, status: 'finished' } }))
 
-    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByTestId('word-race-word')).toBeNull()
     expect(useWordRaceStore.getState().activeRound).toBeNull()
   })
@@ -189,21 +221,34 @@ describe('WordRaceOverlay for a dancer', () => {
   it('ignores events from another room', () => {
     renderAs('me')
     serverEmits('word:round-started', { ...started, roomCode: 'OTHER1' })
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByTestId('word-race-word')).toBeNull()
   })
 })
 
 describe('WordRaceOverlay for a spectator', () => {
-  it('shows the word and the countdown without an input, then who won', () => {
-    renderAs('fan')
+  it('shows a non-modal banner with the word and the countdown, then who won', () => {
+    const { container } = renderAs('fan')
     serverEmits('word:round-started', started)
-    expect(screen.getByTestId('word-race-word').textContent).toBe(WORD)
-    expect(screen.getByRole('timer')).toBeTruthy()
+
+    expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
-    expect(screen.getByText('Dancers are racing to type it...')).toBeTruthy()
+    const banner = screen.getByRole('region', { name: 'Word race' })
+    // Rendered in place, inside the stage, not over the whole page.
+    expect(container.contains(banner)).toBe(true)
+    expect(banner.textContent).toContain('Dancers are racing to type:')
+    expect(within(banner).getByTestId('word-race-word').textContent).toBe(WORD)
+    expect(within(banner).getByRole('timer').textContent).toBe('10s')
+    expect(within(banner).getByText('Word 2 of 3')).toBeTruthy()
 
     serverEmits('word:round-ended', ended())
+    expect(screen.queryByRole('region', { name: 'Word race' })).toBeNull()
     expect(screen.getByRole('status').textContent).toBe('Rival typed it first!')
     expect(screen.getByRole('status').dataset.kind).toBe('watching')
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    act(() => vi.advanceTimersByTime(RESULT_VISIBLE_MS + 100))
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })
+

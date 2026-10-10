@@ -11,7 +11,7 @@ import type {
 } from '../types'
 
 /** How long the end-of-round banner stays on screen. */
-export const RESULT_VISIBLE_MS = 3500
+export const RESULT_VISIBLE_MS = 2500
 
 export interface ActiveWordRound {
   roomCode: string
