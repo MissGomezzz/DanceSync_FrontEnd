@@ -1,10 +1,41 @@
 @import "tailwindcss";
 
 @theme {
+  /* Logo colors, kept for anything that must match public/logo.png. */
   --color-brand-red: #8e0607;
   --color-brand-red-light: #b8262a;
   --color-brand-navy: #0e3c4b;
   --color-brand-navy-light: #1c5a70;
+
+  /*
+   * Semantic palette: components use these names (bg-surface, text-ink,
+   * bg-primary...) instead of raw Tailwind colors, so re-theming is this block.
+   * Every "-strong" shade is the one meant for text on a "-soft" fill (WCAG AA).
+   */
+  --color-canvas: #fff8fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #fdf0f6;
+  --color-line: #f1d6e3;
+
+  --color-ink: #0e3c4b;
+  --color-ink-muted: #4b6470;
+  --color-ink-soft: #587079;
+
+  --color-primary: #e6195c;
+  --color-primary-strong: #c3104a;
+  --color-primary-soft: #ffe1ec;
+  --color-secondary: #7c3aed;
+  --color-secondary-strong: #6d28d9;
+  --color-secondary-soft: #efe7ff;
+  --color-accent: #06b6a4;
+  --color-accent-strong: #0f766e;
+  --color-accent-soft: #d9f7f3;
+  --color-sun: #f59e0b;
+  --color-sun-strong: #b45309;
+  --color-sun-soft: #fff3d6;
+
+  /* Cards: a hairline plus a soft pink-tinted lift. */
+  --shadow-soft: 0 1px 2px rgb(14 60 75 / 0.05), 0 10px 30px -14px rgb(230 25 92 / 0.25);
 
   /* Entrance of full-screen layers and their cards. */
   --animate-fade-in: fade-in 150ms ease-out both;
@@ -58,7 +89,7 @@
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /*
    * Stacking scale, used as z-(--layer-*). Anything drawn over the page picks a
@@ -73,5 +104,17 @@
 }
 
 body {
-  @apply min-h-screen bg-slate-950 text-slate-100 antialiased;
+  @apply min-h-screen bg-canvas text-ink antialiased;
+  /* A faint pink/violet glow at the top of the page; the canvas stays calm below. */
+  background-image:
+    radial-gradient(60rem 28rem at 30% -8rem, rgb(230 25 92 / 0.1), transparent 70%),
+    radial-gradient(48rem 24rem at 85% -6rem, rgb(124 58 237 / 0.1), transparent 70%);
+  background-repeat: no-repeat;
+}
+
+/* Brand gradient text for titles and big numerals (primary to violet). */
+@utility text-gradient-brand {
+  background-image: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  background-clip: text;
+  color: transparent;
 }

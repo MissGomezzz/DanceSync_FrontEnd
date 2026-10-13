@@ -19,7 +19,7 @@ describe('LeaveRoomButton', () => {
     expect(button.textContent).toBe('Leaving…')
     expect(button).toHaveProperty('disabled', true)
     expect(button.dataset.leaving).toBe('true')
-    expect(button.className).toContain('bg-rose-700')
+    expect(button.className).toContain('bg-rose-600')
     expect(onLeave).not.toHaveBeenCalled()
 
     act(() => vi.advanceTimersByTime(LEAVE_FEEDBACK_MS))

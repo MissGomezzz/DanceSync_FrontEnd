@@ -15,7 +15,7 @@ export function ConnectionBanner({ status }: ConnectionBannerProps) {
   return (
     <p
       role="status"
-      className="rounded-lg border border-amber-900 bg-amber-950/40 px-4 py-2 text-sm text-amber-200"
+      className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700"
     >
       {messages[status]}
     </p>

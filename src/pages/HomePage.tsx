@@ -53,8 +53,8 @@ export function HomePage() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-10 p-6">
       <header className="text-center">
-        <h1 className="text-5xl font-extrabold tracking-tight text-brand-red">DanceSync</h1>
-        <p className="mt-3 max-w-md text-slate-400">
+        <h1 className="text-gradient-brand mx-auto w-fit text-5xl font-extrabold tracking-tight">DanceSync</h1>
+        <p className="mt-3 max-w-md text-ink-muted">
           Join a room with up to {MAX_PLAYERS} players. Each player chooses to dance or to spectate: at least{' '}
           {MIN_PLAYERS_TO_START} dancers compete while the spectators watch and vote for the winner.
         </p>
@@ -63,7 +63,7 @@ export function HomePage() {
       {notice && (
         <div
           role="status"
-          className="flex w-full max-w-sm items-center justify-between gap-3 rounded-lg border border-amber-900 bg-amber-950/40 px-4 py-3 text-sm text-amber-200"
+          className="flex w-full max-w-sm items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-700"
         >
           <span>{notice}</span>
           <Button variant="ghost" className="px-2 py-1 text-xs" onClick={dismissNotice}>
@@ -72,7 +72,7 @@ export function HomePage() {
         </div>
       )}
 
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-6">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-line bg-surface p-6 shadow-soft">
         <Input
           id="display-name"
           label="Display name"
@@ -83,10 +83,10 @@ export function HomePage() {
         <Button onClick={handleCreateRoom} disabled={creating || name.trim().length === 0}>
           {creating ? 'Creating room...' : 'Create room'}
         </Button>
-        <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-slate-500">
-          <span className="h-px flex-1 bg-slate-800" />
+        <div className="flex items-center gap-3 text-xs uppercase tracking-wide text-ink-soft">
+          <span className="h-px flex-1 bg-line" />
           or
-          <span className="h-px flex-1 bg-slate-800" />
+          <span className="h-px flex-1 bg-line" />
         </div>
         <Input
           id="join-code"
@@ -102,7 +102,7 @@ export function HomePage() {
         >
           Join room
         </Button>
-        {roomError && <p className="text-sm text-rose-400">{roomError}</p>}
+        {roomError && <p className="text-sm font-medium text-rose-700">{roomError}</p>}
       </div>
     </main>
   )
