@@ -46,17 +46,17 @@ export function SongPickerView({
   return (
     <section
       aria-label="Choose the song"
-      className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-6"
+      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface shadow-soft p-6"
     >
-      <h2 className="text-lg font-semibold">{heading}</h2>
+      <h2 className="text-lg font-semibold text-ink">{heading}</h2>
       {isChooser && seconds !== null && (
-        <p role="timer" aria-label="Time left to choose" className="text-sm text-slate-300">
+        <p role="timer" aria-label="Time left to choose" className="text-sm text-ink-muted">
           Pick within <span className="font-mono font-semibold tabular-nums">{seconds}s</span> or a random song is
           chosen.
         </p>
       )}
       {reason && (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-muted">
           {isChooser ? 'You' : chooserName} {reason}.
         </p>
       )}
@@ -72,7 +72,7 @@ export function SongPickerView({
                 onClick={() => onChoose(song.id)}
               >
                 <span>{song.title}</span>
-                <span className="text-xs font-normal text-slate-400">
+                <span className="text-xs font-normal text-secondary-strong">
                   {song.artist} · {formatDuration(song.durationSeconds)}
                 </span>
               </Button>

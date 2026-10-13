@@ -8,11 +8,11 @@ interface WordRaceBannerViewProps {
 }
 
 const resultTones: Record<WordRaceBannerKind, string> = {
-  won: 'border-emerald-500/70 bg-emerald-950/90 text-emerald-200',
-  lost: 'border-rose-500/70 bg-rose-950/90 text-rose-200',
-  late: 'border-rose-500/70 bg-rose-950/90 text-rose-200',
-  watching: 'border-fuchsia-700/60 bg-slate-900/95 text-slate-100',
-  expired: 'border-slate-600 bg-slate-900/95 text-slate-300',
+  won: 'border-emerald-300 bg-emerald-50 text-emerald-700',
+  lost: 'border-rose-300 bg-rose-50 text-rose-700',
+  late: 'border-rose-300 bg-rose-50 text-rose-700',
+  watching: 'border-secondary/30 bg-surface text-ink',
+  expired: 'border-line bg-surface-muted text-ink-muted',
 }
 
 /**
@@ -29,15 +29,15 @@ export function WordRaceBannerView({ round, result }: WordRaceBannerViewProps) {
         <section
           key={round.roundId}
           aria-label="Word race"
-          className="overflow-hidden rounded-xl border border-fuchsia-700/60 bg-slate-900/95 shadow-lg shadow-black/40 backdrop-blur motion-safe:animate-banner-in motion-reduce:animate-fade-in"
+          className="overflow-hidden rounded-2xl border border-secondary/30 bg-surface/95 shadow-lg shadow-secondary/15 backdrop-blur motion-safe:animate-banner-in motion-reduce:animate-fade-in"
         >
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-fuchsia-300">
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-secondary-strong">
               Word {round.roundNumber} of {round.totalRounds}
             </span>
-            <p className="min-w-0 flex-1 text-sm text-slate-300">
+            <p className="min-w-0 flex-1 text-sm text-ink-muted">
               Dancers are racing to type:{' '}
-              <strong data-testid="word-race-word" className="font-mono text-xl font-bold tracking-wide text-white">
+              <strong data-testid="word-race-word" className="font-mono text-xl font-bold tracking-wide text-primary-strong">
                 {round.word}
               </strong>
             </p>
@@ -53,7 +53,7 @@ export function WordRaceBannerView({ round, result }: WordRaceBannerViewProps) {
         data-kind={showResult ? result.kind : undefined}
         className={
           showResult
-            ? `rounded-xl border px-4 py-3 text-center text-base font-semibold shadow-lg shadow-black/40 motion-safe:animate-banner-in motion-reduce:animate-fade-in ${resultTones[result.kind]}`
+            ? `rounded-xl border px-4 py-3 text-center text-base font-semibold shadow-lg shadow-ink/10 motion-safe:animate-banner-in motion-reduce:animate-fade-in ${resultTones[result.kind]}`
             : undefined
         }
       >

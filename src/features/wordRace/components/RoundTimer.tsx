@@ -23,7 +23,7 @@ export function TimeLeft({ remainingMs, className = '' }: TimerProps) {
     <span
       role="timer"
       aria-label="Time left"
-      className={`font-mono font-bold tabular-nums ${urgent ? 'text-rose-400' : 'text-slate-100'} ${className}`}
+      className={`font-mono font-bold tabular-nums ${urgent ? 'text-rose-600' : 'text-ink'} ${className}`}
     >
       {Math.ceil(remainingMs / 1000)}s
     </span>
@@ -39,9 +39,9 @@ export function TimeBar({ remainingMs, totalMs, className = '' }: TimeBarProps) 
   const urgent = remainingMs <= URGENT_MS
   const progress = totalMs > 0 ? Math.min(100, (remainingMs / totalMs) * 100) : 0
   return (
-    <div aria-hidden className={`w-full overflow-hidden bg-slate-800 ${className}`}>
+    <div aria-hidden className={`w-full overflow-hidden bg-surface-muted ${className}`}>
       <div
-        className={`h-full transition-[width] duration-100 ease-linear ${urgent ? 'bg-rose-500' : 'bg-fuchsia-500'}`}
+        className={`h-full transition-[width] duration-100 ease-linear ${urgent ? 'bg-rose-500' : 'bg-linear-to-r from-primary to-secondary'}`}
         style={{ width: `${progress}%` }}
       />
     </div>

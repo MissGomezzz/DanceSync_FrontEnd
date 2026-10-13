@@ -53,21 +53,21 @@ export function BattleStageView({
   return (
     <section className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 p-3 sm:p-4">
       <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Battle in room {roomCode}</h1>
+        <h1 className="text-2xl font-bold text-ink">Battle in room {roomCode}</h1>
         {room && (
           <Badge tone={room.status === 'battling' ? 'success' : 'accent'}>{statusLabels[room.status]}</Badge>
         )}
       </header>
 
       {room?.battle?.song && (
-        <p className="text-sm text-slate-400">
-          Song: <span className="font-semibold text-slate-100">{room.battle.song.title}</span> by {room.battle.song.artist}
+        <p className="text-sm text-ink-muted">
+          Song: <span className="font-semibold text-ink">{room.battle.song.title}</span> by {room.battle.song.artist}
         </p>
       )}
 
       {connectionBanner}
 
-      {error && <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
+      {error && <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p>}
 
       {results}
 
@@ -77,11 +77,11 @@ export function BattleStageView({
         {/* Music video */}
         <div className="min-w-0">
           {songVideo ? (
-            <div className="w-full overflow-hidden rounded-xl border border-slate-800 bg-black">
+            <div className="w-full overflow-hidden rounded-2xl bg-black shadow-soft">
               {songVideo}
             </div>
           ) : (
-            <div className="flex aspect-video items-center justify-center rounded-xl border border-slate-800 bg-slate-950 p-4 text-center text-sm text-slate-400">
+            <div className="flex aspect-video items-center justify-center rounded-2xl bg-black p-4 text-center text-sm text-white/80 shadow-soft">
               {songPlaceholder(room)}
             </div>
           )}
@@ -113,7 +113,7 @@ export function BattleStageView({
               />
             ))
           ) : (
-            <p className="text-sm text-slate-500 sm:col-span-2 lg:col-span-1">
+            <p className="text-sm text-ink-soft sm:col-span-2 lg:col-span-1">
               Waiting for the battle to start.
             </p>
           )}

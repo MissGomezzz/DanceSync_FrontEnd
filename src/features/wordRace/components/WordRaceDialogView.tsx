@@ -17,19 +17,19 @@ interface WordRaceDialogViewProps {
 
 /** Card accent of each round result: green when I won it, rose when someone else did. */
 const resultTones: Record<WordRaceBannerKind, string> = {
-  won: 'border-emerald-400/70 shadow-emerald-500/20',
-  lost: 'border-rose-500/70 shadow-rose-500/20',
-  late: 'border-rose-500/70 shadow-rose-500/20',
-  watching: 'border-slate-600',
-  expired: 'border-slate-600',
+  won: 'border-emerald-300 bg-emerald-50 shadow-emerald-500/20',
+  lost: 'border-rose-300 bg-rose-50 shadow-rose-500/20',
+  late: 'border-rose-300 bg-rose-50 shadow-rose-500/20',
+  watching: 'border-line bg-surface',
+  expired: 'border-line bg-surface',
 }
 
 const resultTextTones: Record<WordRaceBannerKind, string> = {
-  won: 'text-emerald-300',
-  lost: 'text-rose-300',
-  late: 'text-rose-300',
-  watching: 'text-slate-100',
-  expired: 'text-slate-200',
+  won: 'text-emerald-700',
+  lost: 'text-rose-700',
+  late: 'text-rose-700',
+  watching: 'text-ink',
+  expired: 'text-ink-muted',
 }
 
 /**
@@ -86,8 +86,8 @@ export function WordRaceDialogView({
         aria-labelledby={labelId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className={`flex w-full max-w-2xl flex-col gap-6 rounded-3xl border-2 bg-slate-900/95 p-6 shadow-2xl outline-none sm:p-10 motion-safe:animate-overlay-in motion-reduce:animate-fade-in ${
-          showResult ? resultTones[result.kind] : 'border-fuchsia-500/60 shadow-fuchsia-500/20'
+        className={`flex w-full max-w-2xl flex-col gap-6 rounded-3xl border-2 p-6 shadow-2xl outline-none sm:p-10 motion-safe:animate-overlay-in motion-reduce:animate-fade-in ${
+          showResult ? resultTones[result.kind] : 'border-primary/30 bg-surface shadow-primary/25'
         }`}
       >
         {round && (
@@ -103,7 +103,7 @@ export function WordRaceDialogView({
           />
         )}
         {showResult && (
-          <h2 id={labelId} className="text-center text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+          <h2 id={labelId} className="text-center text-sm font-semibold uppercase tracking-[0.2em] text-ink-muted">
             Round over
           </h2>
         )}
@@ -150,7 +150,7 @@ function RoundPanel({ round, labelId, typed, submitting, notice, onTypedChange, 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       <header className="flex items-center justify-between gap-4">
-        <h2 id={labelId} className="text-sm font-semibold uppercase tracking-[0.2em] text-fuchsia-300">
+        <h2 id={labelId} className="text-sm font-semibold uppercase tracking-[0.2em] text-secondary-strong">
           Word {round.roundNumber} of {round.totalRounds}
         </h2>
         <TimeLeft remainingMs={round.remainingMs} className="text-2xl" />
@@ -160,7 +160,7 @@ function RoundPanel({ round, labelId, typed, submitting, notice, onTypedChange, 
 
       <p
         data-testid="word-race-word"
-        className="select-none break-all text-center font-mono text-6xl font-black tracking-wide text-white [text-shadow:0_4px_24px_rgb(217_70_239/0.45)] sm:text-7xl lg:text-8xl"
+        className="mx-auto w-fit max-w-full select-none break-all text-center font-mono text-6xl font-black tracking-wide text-gradient-brand sm:text-7xl lg:text-8xl"
       >
         {round.word}
       </p>
@@ -183,23 +183,23 @@ function RoundPanel({ round, labelId, typed, submitting, notice, onTypedChange, 
           autoCapitalize="off"
           spellCheck={false}
           placeholder={timeUp ? "Time's up" : 'Type it and press Enter'}
-          className="min-w-0 flex-1 rounded-xl border-2 border-slate-700 bg-slate-950 px-4 py-3 text-center font-mono text-2xl text-slate-100 placeholder:text-base placeholder:text-slate-600 focus:border-fuchsia-500 focus:outline-none disabled:opacity-50 sm:text-left"
+          className="min-w-0 flex-1 rounded-xl border-2 border-line bg-surface px-4 py-3 text-center font-mono text-2xl text-ink placeholder:text-base placeholder:text-ink-soft/70 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 sm:text-left"
         />
         <button
           type="submit"
           disabled={!canType || typed.trim().length === 0}
-          className="rounded-xl bg-brand-red px-6 py-3 text-base font-semibold text-white hover:bg-brand-red-light focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? 'Checking...' : 'Send'}
         </button>
       </form>
 
       {notice ? (
-        <p role="alert" className="rounded-xl border border-rose-900 bg-rose-950/60 px-4 py-2 text-center text-base font-medium text-rose-200">
+        <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-center text-base font-medium text-rose-700">
           {notice}
         </p>
       ) : (
-        <p className="text-center text-sm text-slate-400">Be the first dancer to type it.</p>
+        <p className="text-center text-sm text-ink-muted">Be the first dancer to type it.</p>
       )}
     </div>
   )

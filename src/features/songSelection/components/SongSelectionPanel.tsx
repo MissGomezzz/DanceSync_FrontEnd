@@ -54,21 +54,21 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
   return (
     <section
       aria-label="Song"
-      className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-6"
+      className="flex flex-col gap-3 rounded-2xl border border-line bg-surface shadow-soft p-6"
     >
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Song</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Song</h2>
       {room.selectedSong ? (
         <>
-          <p className="text-lg">
+          <p className="text-lg text-ink">
             <span className="font-semibold">{room.selectedSong.title}</span>{' '}
-            <span className="text-slate-400">by {room.selectedSong.artist}</span>
+            <span className="text-ink-muted">by {room.selectedSong.artist}</span>
           </p>
           {selection?.autoPicked && (
-            <p className="text-sm text-slate-400">Time ran out, a random song was picked.</p>
+            <p className="text-sm text-ink-muted">Time ran out, a random song was picked.</p>
           )}
         </>
       ) : (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-muted">
           No song chosen yet. When the host starts the battle, the dancers race to type a phrase and the winner picks
           the song.
         </p>

@@ -22,8 +22,8 @@ export function RoleSelector({ myRole, pending, onSelectDancer, onSelectSpectato
   const chosen = myRole === 'dancer' || myRole === 'spectator' ? myRole : null
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-6">
-      <p className="text-sm text-slate-300">
+    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface shadow-soft p-6">
+      <p className="text-sm text-ink-muted">
         {chosen
           ? `${roleLabels[chosen]} You can switch until the battle starts.`
           : 'Choose your role for this room:'}

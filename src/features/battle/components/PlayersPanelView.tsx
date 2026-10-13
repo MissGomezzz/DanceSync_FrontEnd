@@ -18,21 +18,21 @@ export function PlayersPanelView({ players, hostId, myId }: PlayersPanelViewProp
   return (
     <section
       aria-labelledby="players-heading"
-      className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4"
+      className="flex flex-col gap-3 rounded-2xl border border-line bg-surface shadow-soft p-4"
     >
-      <h2 id="players-heading" className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+      <h2 id="players-heading" className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
         Players ({players.length})
       </h2>
       <ul className="flex flex-col gap-1.5" aria-label="Players in the room">
         {players.map((player) => (
           <li key={player.id} className="flex items-center justify-between gap-2 text-sm">
-            <span className="truncate font-medium text-slate-100">
+            <span className="truncate font-medium text-ink">
               {player.displayName}
-              {player.id === myId && <span className="ml-1 text-xs font-semibold text-emerald-300">(you)</span>}
+              {player.id === myId && <span className="ml-1 text-xs font-semibold text-accent-strong">(you)</span>}
             </span>
             <span className="flex shrink-0 gap-1.5">
-              {player.id === hostId && <Badge tone="success">host</Badge>}
-              <Badge tone={player.role === 'dancer' ? 'accent' : 'neutral'}>{roleLabels[player.role]}</Badge>
+              {player.id === hostId && <Badge tone="sun">host</Badge>}
+              <Badge tone={player.role === 'dancer' ? 'accent' : player.role === 'spectator' ? 'teal' : 'neutral'}>{roleLabels[player.role]}</Badge>
             </span>
           </li>
         ))}

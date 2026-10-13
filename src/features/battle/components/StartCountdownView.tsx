@@ -11,19 +11,19 @@ interface StartCountdownViewProps {
  */
 export function StartCountdownView({ step }: StartCountdownViewProps) {
   const numeral = /^\d$/.test(step)
-  const tone = numeral ? 'text-white' : step === 'Dance!' ? 'text-fuchsia-300' : 'text-slate-200'
+  const tone = numeral ? 'text-gradient-brand' : step === 'Dance!' ? 'text-primary' : 'text-white'
   const size = numeral ? 'text-[10rem] leading-none sm:text-[14rem]' : 'text-6xl sm:text-8xl'
 
   return createPortal(
     <div
       data-testid="start-countdown"
-      className="pointer-events-none fixed inset-0 z-(--layer-countdown) flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm animate-fade-in"
+      className="pointer-events-none fixed inset-0 z-(--layer-countdown) flex items-center justify-center bg-black/55 p-6 backdrop-blur-sm animate-fade-in"
     >
       <div role="status" aria-live="assertive" className="text-center">
         {/* Keyed by step, so every new numeral pops in again. */}
         <span
           key={step}
-          className={`block font-black tracking-tight tabular-nums [text-shadow:0_6px_40px_rgb(217_70_239/0.55)] motion-safe:animate-count-pop motion-reduce:animate-fade-in ${tone} ${size}`}
+          className={`block font-black tracking-tight tabular-nums [filter:drop-shadow(0_0_3px_rgb(255_255_255/0.95))_drop-shadow(0_8px_36px_rgb(230_25_92/0.6))] motion-safe:animate-count-pop motion-reduce:animate-fade-in ${tone} ${size}`}
         >
           {step}
         </span>

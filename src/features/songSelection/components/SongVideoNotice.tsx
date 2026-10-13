@@ -8,8 +8,8 @@ interface SongVideoNoticeProps {
  */
 export function SongVideoNotice({ message }: SongVideoNoticeProps) {
   return (
-    <div className="flex aspect-video w-full items-center justify-center bg-slate-950 p-6">
-      <p role="note" className="max-w-md rounded-xl border border-slate-700 bg-slate-900/80 px-5 py-4 text-center text-sm text-slate-300">
+    <div className="flex aspect-video w-full items-center justify-center bg-black p-6">
+      <p role="note" className="max-w-md rounded-xl border border-white/15 bg-white/10 px-5 py-4 text-center text-sm text-white/90 backdrop-blur-sm">
         {message}
       </p>
     </div>

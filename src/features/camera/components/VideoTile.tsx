@@ -26,7 +26,7 @@ export function VideoTile({ stream, label, mirrored = false, placeholder, badges
   const showVideo = !overlay && stream !== null
 
   return (
-    <figure className="flex flex-col overflow-hidden rounded-xl border border-fuchsia-900/60 bg-slate-900">
+    <figure className="flex flex-col overflow-hidden rounded-2xl border-2 border-secondary/25 bg-black shadow-soft">
       {/* object-contain keeps the whole dancer in frame whatever the camera's aspect ratio. */}
       <div className="relative aspect-video bg-black">
         <video
@@ -39,7 +39,7 @@ export function VideoTile({ stream, label, mirrored = false, placeholder, badges
         />
         {overlay ??
           (!showVideo && (
-            <div className="absolute inset-0 flex items-center justify-center p-4 pb-14 text-center text-sm text-slate-500">
+            <div className="absolute inset-0 flex items-center justify-center p-4 pb-14 text-center text-sm text-white/75">
               {placeholder}
             </div>
           ))}

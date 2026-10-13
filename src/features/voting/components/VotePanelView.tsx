@@ -27,19 +27,19 @@ export function VotePanelView({
   const disabled = disabledReason !== null || pending
 
   return (
-    <section aria-labelledby="vote-heading" className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-      <h2 id="vote-heading" className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+    <section aria-labelledby="vote-heading" className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-soft">
+      <h2 id="vote-heading" className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
         Vote for your favourite
       </h2>
 
       {disabledReason ? (
-        <p className="text-sm font-medium text-amber-300">{disabledReason}</p>
+        <p className="text-sm font-medium text-sun-strong">{disabledReason}</p>
       ) : (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ink-soft">
           Tap a dancer to vote, another one to move your vote, or yours again to withdraw it.
         </p>
       )}
-      {!disabledReason && timing && <p className="text-sm font-medium text-amber-300">{timing}</p>}
+      {!disabledReason && timing && <p className="text-sm font-medium text-sun-strong">{timing}</p>}
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Dancers">
         {dancers.map((dancer) => {
@@ -51,10 +51,10 @@ export function VotePanelView({
               aria-pressed={selected}
               disabled={disabled}
               onClick={() => onVote(dancer.id)}
-              className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-red disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 ${
                 selected
-                  ? 'border-fuchsia-400 bg-fuchsia-600 text-white shadow-inner'
-                  : 'border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700'
+                  ? 'border-primary bg-primary text-white shadow-sm'
+                  : 'border-line bg-surface text-ink hover:border-primary/40 hover:bg-primary-soft'
               }`}
             >
               {dancer.displayName}
@@ -63,10 +63,10 @@ export function VotePanelView({
         })}
       </div>
 
-      <p className="text-sm text-slate-300" aria-live="polite">
+      <p className="text-sm text-ink-muted" aria-live="polite">
         {myVote ? (
           <>
-            Your vote: <span className="font-semibold text-fuchsia-300">{myVote.displayName}</span>
+            Your vote: <span className="font-semibold text-primary-strong">{myVote.displayName}</span>
           </>
         ) : (
           !disabledReason && 'You have not voted yet.'
@@ -74,7 +74,7 @@ export function VotePanelView({
       </p>
 
       {error && (
-        <p role="alert" className="text-xs text-rose-400">
+        <p role="alert" className="text-xs text-rose-700">
           {error}
         </p>
       )}

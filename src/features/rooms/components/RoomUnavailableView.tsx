@@ -15,9 +15,9 @@ interface RoomUnavailableViewProps {
 export function RoomUnavailableView({ roomCode, reason, onBack, onRetry }: RoomUnavailableViewProps) {
   return (
     <section className="mx-auto flex w-full max-w-md flex-col items-center gap-4 p-10 text-center">
-      <h1 className="text-2xl font-bold">Cannot join room {roomCode}</h1>
-      <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{reason}</p>
-      <p className="text-sm text-slate-400">
+      <h1 className="text-2xl font-bold text-ink">Cannot join room {roomCode}</h1>
+      <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{reason}</p>
+      <p className="text-sm text-ink-muted">
         Check the code with the room host. Rooms close automatically when every player leaves.
       </p>
       <div className="flex gap-3">

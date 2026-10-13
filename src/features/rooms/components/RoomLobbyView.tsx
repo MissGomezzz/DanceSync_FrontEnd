@@ -44,22 +44,22 @@ export function RoomLobbyView({
   kickingPlayerId = null,
 }: RoomLobbyViewProps) {
   return (
-    <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+    <section className="flex w-full flex-col gap-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Room {roomCode}</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-bold text-ink">Room {roomCode}</h1>
+          <p className="text-sm text-ink-muted">
             {players.length} / {maxPlayers} players
           </p>
         </div>
         <Badge tone="accent">Lobby</Badge>
       </header>
 
-      {error && <p className="rounded-lg border border-rose-900 bg-rose-950/40 px-4 py-3 text-sm text-rose-300">{error}</p>}
+      {error && <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p>}
 
       <div className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Players</h2>
-        {players.length === 0 && <p className="text-sm text-slate-500">Joining room...</p>}
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Players</h2>
+        {players.length === 0 && <p className="text-sm text-ink-soft">Joining room...</p>}
         {players.map((player) => (
           <PlayerCard
             key={player.id}
@@ -80,17 +80,17 @@ export function RoomLobbyView({
 
       <div className="grid gap-6 md:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Dancers</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Dancers</h2>
           {dancers.length === 0 && (
-            <p className="text-sm text-slate-500">No dancers yet. Players who choose "Dance" compete in the battle.</p>
+            <p className="text-sm text-ink-soft">No dancers yet. Players who choose "Dance" compete in the battle.</p>
           )}
           {dancers.map((player) => (
             <PlayerCard key={player.id} player={player} isHost={player.id === hostId} />
           ))}
         </div>
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Spectators</h2>
-          {spectators.length === 0 && <p className="text-sm text-slate-500">No spectators yet.</p>}
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Spectators</h2>
+          {spectators.length === 0 && <p className="text-sm text-ink-soft">No spectators yet.</p>}
           {spectators.map((player) => (
             <PlayerCard key={player.id} player={player} isHost={player.id === hostId} />
           ))}
@@ -98,7 +98,7 @@ export function RoomLobbyView({
       </div>
 
       <footer className="flex items-center justify-end gap-3">
-        {startHint && <p className="text-sm text-slate-500">{startHint}</p>}
+        {startHint && <p className="text-sm text-ink-soft">{startHint}</p>}
         <LeaveRoomButton onLeave={onLeave} />
         {isHost && (
           <Button onClick={onStartBattle} disabled={!canStart}>

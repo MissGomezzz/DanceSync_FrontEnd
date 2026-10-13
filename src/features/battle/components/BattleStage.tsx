@@ -124,7 +124,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
                 {rematching ? 'Starting rematch...' : 'Rematch'}
               </Button>
             ) : (
-              <p className="self-center text-sm text-slate-500">The host can start a rematch.</p>
+              <p className="self-center text-sm text-ink-soft">The host can start a rematch.</p>
             )}
             <LeaveRoomButton onLeave={handleLeave} />
           </>

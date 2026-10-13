@@ -19,10 +19,10 @@ interface ResultsDashboardViewProps {
 }
 
 const podiumTones: Record<RankTone, string> = {
-  gold: 'border-amber-400 bg-amber-400/15 text-amber-100',
-  silver: 'border-slate-300 bg-slate-300/10 text-slate-100',
-  bronze: 'border-orange-500 bg-orange-700/20 text-orange-100',
-  neutral: 'border-slate-700 bg-slate-900 text-slate-300',
+  gold: 'border-sun bg-sun-soft text-sun-strong',
+  silver: 'border-slate-300 bg-slate-100 text-slate-600',
+  bronze: 'border-orange-300 bg-orange-50 text-orange-700',
+  neutral: 'border-line bg-surface-muted text-ink-muted',
 }
 
 /** Podium steps: 1st in the middle and tallest, 2nd on the left, 3rd on the right. */
@@ -40,19 +40,19 @@ export function ResultsDashboardView({
   return (
     <section
       aria-labelledby="results-heading"
-      className="flex flex-col gap-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4"
+      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 shadow-soft"
     >
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="results-heading" className="text-lg font-bold">
+        <h2 id="results-heading" className="text-lg font-bold text-ink">
           Final results
         </h2>
-        {endReason && <p className="text-sm text-slate-400">{endReason}</p>}
+        {endReason && <p className="text-sm text-ink-muted">{endReason}</p>}
       </header>
 
       {standings && standings.length > 0 ? (
         <Results standings={standings} winnerId={winnerId} myId={myId} />
       ) : (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-muted">
           {loading
             ? 'Loading the results...'
             : failed
@@ -72,11 +72,11 @@ function Results({ standings, winnerId, myId }: { standings: Standing[]; winnerI
   const winner = standings.find((s) => s.dancerId === winnerId)
   const topScore = Math.max(...standings.map((s) => s.score))
   const you = (id: string) =>
-    id === myId ? <span className="ml-1 text-xs font-semibold text-emerald-300">(you)</span> : null
+    id === myId ? <span className="ml-1 text-xs font-semibold text-accent-strong">(you)</span> : null
 
   return (
     <>
-      <p className="text-xl font-extrabold text-amber-300">
+      <p className="text-gradient-brand w-fit text-xl font-extrabold">
         {isDraw ? 'It is a tie!' : `Winner: ${winner?.displayName ?? 'Former dancer'}`}
       </p>
 
@@ -91,7 +91,7 @@ function Results({ standings, winnerId, myId }: { standings: Standing[]; winnerI
             >
               <div
                 className={`flex flex-col items-center gap-1 rounded-xl border-2 px-3 py-4 text-center ${podiumTones[rankTone(standing.rank)]} ${
-                  leader ? 'ring-2 ring-amber-300 ring-offset-2 ring-offset-slate-950' : ''
+                  leader ? 'shadow-soft ring-2 ring-sun ring-offset-2 ring-offset-surface' : ''
                 }`}
               >
                 <span className="text-xs font-semibold uppercase tracking-wide">{ordinal(standing.rank)}</span>
@@ -110,7 +110,7 @@ function Results({ standings, winnerId, myId }: { standings: Standing[]; winnerI
         <table className="w-full min-w-[28rem] text-sm">
           <caption className="sr-only">Final ranking</caption>
           <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr className="text-left text-xs uppercase tracking-wide text-ink-soft">
               <th scope="col" className="px-2 py-1 font-medium">
                 Rank
               </th>
@@ -139,7 +139,7 @@ function Results({ standings, winnerId, myId }: { standings: Standing[]; winnerI
                 <tr
                   key={standing.dancerId}
                   data-winner={leader}
-                  className={`border-t border-slate-800 ${leader ? 'bg-amber-400/10 font-semibold text-amber-100' : ''}`}
+                  className={`border-t border-line ${leader ? 'bg-sun-soft font-semibold text-sun-strong' : 'text-ink'}`}
                 >
                   <td className="px-2 py-2">{ordinal(standing.rank)}</td>
                   <td className="px-2 py-2">
@@ -149,7 +149,7 @@ function Results({ standings, winnerId, myId }: { standings: Standing[]; winnerI
                   <td className="px-2 py-2 text-right tabular-nums">{standing.votes}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{standing.wordsWon}</td>
                   <td className="px-2 py-2 text-right tabular-nums">{standing.score}</td>
-                  <td className="px-2 py-2 text-right tabular-nums text-slate-400">
+                  <td className="px-2 py-2 text-right tabular-nums text-ink-muted">
                     {gap === 0 ? 'Leader' : `−${gap} pts`}
                   </td>
                 </tr>

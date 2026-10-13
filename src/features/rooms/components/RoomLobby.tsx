@@ -150,7 +150,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
           : null
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <ConnectionBanner status={connection} />
       {inRoom && (
         <RoleSelector
@@ -162,9 +162,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
       )}
       {inRoom && <ReadyButton ready={me?.ready === true} pending={readyPending} onToggle={() => void handleToggleReady()} />}
       {inRoom && room.lastResult?.standings && room.lastResult.standings.length > 0 && (
-        <div className="mx-auto w-full max-w-3xl px-6">
-          <LastBattleCardView standings={room.lastResult.standings} winnerId={room.lastResult.winnerId} />
-        </div>
+        <LastBattleCardView standings={room.lastResult.standings} winnerId={room.lastResult.winnerId} />
       )}
       {inRoom && <SongSelectionPanel room={room} />}
       <RoomLobbyView
