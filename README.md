@@ -12,7 +12,7 @@ Payments are planned for a later stage.
 - [zustand](https://zustand.docs.pmnd.rs/) for global state
 - [react-router v7](https://reactrouter.com/) (`createBrowserRouter` + `RouterProvider`)
 - [socket.io-client](https://socket.io/) for the real-time battle service
-- Authentication with Azure Entra ID is planned; only environment placeholders exist for now.
+- [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-js) (`@azure/msal-browser`) for signing in with Microsoft Entra ID; guests join with a room code and a token issued by the server (see [Authentication](#authentication))
 
 ## Folder structure
 
@@ -23,7 +23,7 @@ shared UI, and the container/presentational pattern inside each feature.
 src/
   app/                composition root: App, router, and application-wide providers
   features/
-    auth/             authentication store and components (Azure Entra ID later)
+    auth/             session store, MSAL client and route guards (Microsoft Entra ID + guest tokens)
     rooms/            lobby: create or join a room with up to 7 players and choose to dance or spectate
     battle/           real-time dance battle between the dancers (two or more) and the players panel
     camera/           camera permission, WebRTC peer session, and video tiles for the battle stage
@@ -175,8 +175,21 @@ Copy `.env.example` to `.env` and adjust the values as needed. `.env` is ignored
 | ---------------------- | -------------------------------------------------- | ----------------------- |
 | `VITE_API_URL`         | Base URL of the API gateway (REST)                 | `http://localhost:8080` |
 | `VITE_WS_URL`          | Base URL of the Socket.IO server                   | `http://localhost:8080` |
-| `VITE_AZURE_CLIENT_ID` | Azure Entra ID application (client) id             | empty                   |
-| `VITE_AZURE_TENANT_ID` | Azure Entra ID tenant id                           | empty                   |
+| `VITE_AZURE_CLIENT_ID` | Microsoft Entra ID application (client) id         | empty                   |
+| `VITE_AZURE_TENANT_ID` | Microsoft Entra ID tenant id                       | empty                   |
+| `VITE_AZURE_API_SCOPE` | Scope of the DanceSync API requested at sign-in    | `api://<client id>/access_as_user` |
+
+Without the two Entra ID values "Sign in with Microsoft" is disabled and only guests can get in.
+
+## Authentication
+
+Quality scenario SEG-1; the backend side and the evidence are in the backend repository (`docs/quality/SEG-1-seguridad-autenticacion.md`).
+
+- **Registered users** sign in on the Microsoft page (MSAL, redirect flow). The app never sees a password. Only they reach `/home` and can create rooms.
+- **Guests** enter a display name and a room code on the login page. The app asks the server for a guest token (`POST /api/rooms/{code}/guest-token`), valid only for that room and for a limited time, and the player id is the one the server generated.
+- The access token is sent as `Authorization: Bearer` on every HTTP request (`shared/api/httpClient.ts`), in the Socket.IO handshake (`shared/lib/socket.ts`) and in the body of the leave beacon. The player id shown in the UI is the one inside the token; the server ignores any id the client sends.
+- Route guards (`features/auth/components/RouteGuards.tsx`) send anyone without a suitable session to the login page; a shared room link keeps its code (`/?join=CODE`). They are navigation only: the backend is what refuses a request.
+- Tokens live in `sessionStorage` (per tab) and are gone when the tab closes.
 
 ## Backend
 

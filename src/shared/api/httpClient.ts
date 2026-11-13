@@ -1,3 +1,4 @@
+import { getAccessToken } from '../lib/authSession'
 import { env } from '../lib/env'
 
 export class HttpError extends Error {
@@ -17,15 +18,20 @@ interface RequestOptions {
   body?: unknown
   headers?: Record<string, string>
   signal?: AbortSignal
+  /** Sends the request without the access token (only the guest-token request needs this). */
+  anonymous?: boolean
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, headers = {}, signal } = options
+  const { method = 'GET', body, headers = {}, signal, anonymous = false } = options
+  // Every request carries the session's access token: the gateway answers 401 without a valid one.
+  const token = anonymous ? null : await getAccessToken()
 
   const response = await fetch(`${env.apiUrl}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),

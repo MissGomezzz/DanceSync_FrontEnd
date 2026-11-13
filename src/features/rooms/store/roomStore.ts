@@ -13,6 +13,9 @@ export const MIN_PLAYERS_TO_START = 2
 
 export const KICKED_NOTICE = 'The host removed you from the room.'
 
+/** Shown when an action needs a session and there is none (the route guards normally prevent it). */
+export const SIGN_IN_REQUIRED = 'Sign in, or join as a guest with the room code, to continue.'
+
 /** Plain-words explanation of each rematch rejection; anything else shows the server's message. */
 export const rematchErrorMessages: Record<string, string> = {
   NOT_HOST: 'Only the host can start a rematch.',
@@ -120,11 +123,13 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   },
   createRoom: async (displayName) => {
     const identity = useAuthStore.getState().setDisplayName(displayName)
+    if (!identity) {
+      set({ error: SIGN_IN_REQUIRED })
+      return null
+    }
     try {
-      const created = await httpClient.post<Room>('/api/rooms', {
-        hostId: identity.id,
-        displayName: identity.displayName,
-      })
+      // The host is the signed-in user: the server takes it from the access token.
+      const created = await httpClient.post<Room>('/api/rooms', { displayName: identity.displayName })
       return await get().joinRoom(created.code)
     } catch (error) {
       set({ error: toErrorMessage(error) })
@@ -132,9 +137,13 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     }
   },
   joinRoom: async (roomCode) => {
-    const identity = useAuthStore.getState().ensureIdentity()
-    initRoomSync()
+    const identity = useAuthStore.getState().identity
     const code = roomCode.trim().toUpperCase()
+    if (!identity) {
+      set({ joinError: SIGN_IN_REQUIRED })
+      return null
+    }
+    initRoomSync()
     const previous = get().room
     if (previous && previous.code !== code) {
       // The player reached another room without "Leave room" (logo, Back, typed

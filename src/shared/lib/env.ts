@@ -7,6 +7,8 @@ export const env = {
   wsUrl: import.meta.env.VITE_WS_URL ?? 'http://localhost:8080',
   azureClientId: import.meta.env.VITE_AZURE_CLIENT_ID ?? '',
   azureTenantId: import.meta.env.VITE_AZURE_TENANT_ID ?? '',
+  /** Scope of the DanceSync API; defaults to api://<client id>/access_as_user. */
+  azureApiScope: import.meta.env.VITE_AZURE_API_SCOPE ?? '',
 } as const
 
 export type Env = typeof env
