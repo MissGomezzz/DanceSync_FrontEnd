@@ -15,6 +15,7 @@ export function HomePage() {
   const navigate = useNavigate()
   const identity = useAuthStore((state) => state.identity)
   const setDisplayName = useAuthStore((state) => state.setDisplayName)
+  const signOut = useAuthStore((state) => state.signOut)
   const createRoom = useRoomStore((state) => state.createRoom)
   const leaveRoom = useRoomStore((state) => state.leaveRoom)
   const roomError = useRoomError()
@@ -104,6 +105,10 @@ export function HomePage() {
         </Button>
         {roomError && <p className="text-sm font-medium text-rose-700">{roomError}</p>}
       </div>
+
+      <Button variant="ghost" className="text-xs" onClick={() => void signOut()}>
+        Sign out
+      </Button>
     </main>
   )
 }

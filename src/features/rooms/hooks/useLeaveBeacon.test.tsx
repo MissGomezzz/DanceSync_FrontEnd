@@ -1,5 +1,6 @@
 import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getAccessToken, setAccessTokenProvider } from '../../../shared/lib/authSession'
 import { env } from '../../../shared/lib/env'
 import type { Room } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
@@ -43,6 +44,7 @@ beforeEach(() => {
   emitWithAck.mockReturnValue(new Promise(() => {}))
   Object.defineProperty(navigator, 'sendBeacon', { value: sendBeacon, configurable: true, writable: true })
   useAuthStore.setState({ identity: { id: 'me', displayName: 'Me' } })
+  setAccessTokenProvider(async () => 'my-access-token')
 })
 
 afterEach(() => {
@@ -50,14 +52,30 @@ afterEach(() => {
 })
 
 describe('useLeaveBeacon', () => {
-  it('frees the seat with a beacon when the tab closes while in a room', () => {
+  it('frees the seat with a beacon carrying the access token when the tab closes while in a room', async () => {
     useRoomStore.setState({ room })
     render(<Probe />)
+    await act(async () => void (await getAccessToken()))
 
     closeTab()
 
+    // No player id: the server leaves as the player the token identifies.
     expect(sendBeacon).toHaveBeenCalledTimes(1)
-    expect(sendBeacon).toHaveBeenCalledWith(`${env.apiUrl}/api/rooms/ROOM01/leave`, JSON.stringify({ playerId: 'me', reason: 'pagehide' }))
+    expect(sendBeacon).toHaveBeenCalledWith(
+      `${env.apiUrl}/api/rooms/ROOM01/leave`,
+      JSON.stringify({ reason: 'pagehide', token: 'my-access-token' }),
+    )
+  })
+
+  it('sends nothing without a token (the server would refuse it)', async () => {
+    setAccessTokenProvider(async () => null)
+    useRoomStore.setState({ room })
+    render(<Probe />)
+    await act(async () => void (await getAccessToken()))
+
+    closeTab()
+
+    expect(sendBeacon).not.toHaveBeenCalled()
   })
 
   it('sends nothing outside a room', () => {

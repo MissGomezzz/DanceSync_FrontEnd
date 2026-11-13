@@ -19,7 +19,8 @@ export function ChatPanel({ roomCode }: ChatPanelProps) {
     const content = draft.trim()
     if (content.length === 0 || sending) return
 
-    const identity = useAuthStore.getState().ensureIdentity()
+    const identity = useAuthStore.getState().identity
+    if (!identity) return
     setSending(true)
     try {
       // The server broadcasts the message back to everyone in the room,
