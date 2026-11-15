@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useConnectionStore } from './connectionStatus'
 
 type AckCallback = (err: Error | null, response?: unknown) => void
@@ -8,7 +8,7 @@ type HandshakeAuth = (send: (auth: Record<string, unknown>) => void) => void
 
 const { fakeSocket, handlers, ioOptions } = vi.hoisted(() => {
   const handlers = new Map<string, Set<Handler>>()
-  const ioOptions: { auth?: HandshakeAuth } = {}
+  const ioOptions: { auth?: HandshakeAuth; transports?: string[]; tryAllTransports?: boolean } = {}
   const fakeSocket = {
     connected: true,
     active: true,
@@ -27,13 +27,15 @@ const { fakeSocket, handlers, ioOptions } = vi.hoisted(() => {
 })
 
 vi.mock('socket.io-client', () => ({
-  io: (_url: string, options: { auth?: HandshakeAuth }) => {
+  io: (_url: string, options: { auth?: HandshakeAuth; transports?: string[]; tryAllTransports?: boolean }) => {
     ioOptions.auth = options.auth
+    ioOptions.transports = options.transports
+    ioOptions.tryAllTransports = options.tryAllTransports
     return fakeSocket
   },
 }))
 
-const { ACK_TIMEOUT_MS, emitWithAck, SocketDomainError } = await import('./socket')
+const { ACK_TIMEOUT_MS, BLOCKED, emitWithAck, SLOW_DOWN_NOTICE_MS, SocketDomainError } = await import('./socket')
 const { notifySessionChange, setAccessTokenProvider } = await import('./authSession')
 
 /** Fires a socket event the way socket.io-client would. */
@@ -81,6 +83,16 @@ describe('emitWithAck', () => {
     const pending = emitWithAck('room:join', { roomCode: 'NOPE' })
     answerLastEmit(null, { ok: false, error: { code: 'ROOM_NOT_FOUND', message: 'Room not found' } })
     await expect(pending).rejects.toMatchObject({ code: 'ROOM_NOT_FOUND', message: 'Room not found' })
+  })
+})
+
+describe('transports (REN-1, ADR-02)', () => {
+  it('connects over WebSocket first and keeps long-polling only as a fallback', () => {
+    // WebSocket first: a normal connection makes no long-polling request, so the
+    // replicas behind the load balancer need no session affinity.
+    expect(ioOptions.transports).toEqual(['websocket', 'polling'])
+    // Without this, a failed WebSocket would not fall back to long-polling.
+    expect(ioOptions.tryAllTransports).toBe(true)
   })
 })
 
@@ -137,5 +149,65 @@ describe('handshake authentication (SEG-1)', () => {
     fakeSocket.active = false
     notifySessionChange()
     expect(fakeSocket.disconnect).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('abuse protection feedback (SEG-3)', () => {
+  beforeEach(() => {
+    useConnectionStore.setState({ status: 'connected', blockedUntil: null, slowDownUntil: null })
+    fakeSocket.connect.mockClear()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows a "slow down" notice when the server drops some events, and hides it after a while', () => {
+    vi.useFakeTimers()
+    fire('rate:limited', { code: 'RATE_LIMITED', dropped: 12, retryAfterMs: 50 })
+    expect(useConnectionStore.getState().status).toBe('connected')
+    expect(useConnectionStore.getState().slowDownUntil).not.toBeNull()
+    vi.advanceTimersByTime(SLOW_DOWN_NOTICE_MS)
+    expect(useConnectionStore.getState().slowDownUntil).toBeNull()
+  })
+
+  it('keeps the block through the disconnect that follows it and comes back on its own when it ends', () => {
+    vi.useFakeTimers()
+    fire('rate:blocked', { code: 'BLOCKED', retryAfterMs: 30_000 })
+    fire('disconnect', 'io server disconnect')
+    expect(useConnectionStore.getState().status).toBe('blocked')
+    expect(useConnectionStore.getState().blockedUntil).not.toBeNull()
+
+    // socket.io-client never retries a connection the server closed: the client reconnects itself.
+    fakeSocket.connected = false
+    fakeSocket.active = false
+    vi.advanceTimersByTime(29_000)
+    expect(fakeSocket.connect).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1_500)
+    expect(fakeSocket.connect).toHaveBeenCalledTimes(1)
+    expect(useConnectionStore.getState().status).toBe('blocked') // until the server accepts it again
+
+    fire('connect')
+    expect(useConnectionStore.getState()).toMatchObject({ status: 'connected', blockedUntil: null })
+  })
+
+  it('refuses an action at once while blocked, without sending anything', async () => {
+    fire('rate:blocked', { code: 'BLOCKED', retryAfterMs: 30_000 })
+    const error = await emitWithAck('chat:message', { content: 'hi' }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(SocketDomainError)
+    expect(error).toMatchObject({ code: BLOCKED })
+    expect((error as Error).message).toMatch(/Try again in (29|30) s/)
+    expect(fakeSocket.emit).not.toHaveBeenCalled()
+  })
+
+  it('treats a handshake refused with BLOCKED as a block, and rejects the pending emit at once', async () => {
+    const pending = emitWithAck('room:join', { roomCode: 'ROOM01' })
+    const refusal = Object.assign(new Error('BLOCKED'), { data: { code: 'BLOCKED', retryAfterMs: 12_000 } })
+    fire('connect_error', refusal)
+
+    expect(useConnectionStore.getState().status).toBe('blocked')
+    const error = await pending.catch((e: unknown) => e)
+    expect(error).toMatchObject({ code: BLOCKED, message: 'You sent too many actions too fast. Try again in 12 s.' })
+    expect(handlers.get('connect_error')?.size).toBe(1) // only the status listener is left
   })
 })

@@ -11,6 +11,20 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * SEG-3: the gateway refused the request because this address sent too many
+ * (429). `retryAfterSeconds` comes from the response's Retry-After header.
+ */
+export class RateLimitedError extends HttpError {
+  readonly retryAfterSeconds: number
+
+  constructor(retryAfterSeconds: number) {
+    super(429, `Too many requests. Wait ${retryAfterSeconds} s and try again.`)
+    this.name = 'RateLimitedError'
+    this.retryAfterSeconds = retryAfterSeconds
+  }
+}
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 interface RequestOptions {
@@ -37,6 +51,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     body: body === undefined ? undefined : JSON.stringify(body),
     signal,
   })
+
+  if (response.status === 429) {
+    const retryAfter = Number(response.headers.get('Retry-After'))
+    throw new RateLimitedError(Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter) : 1)
+  }
 
   if (!response.ok) {
     throw new HttpError(response.status, `Request to ${path} failed with status ${response.status}`)

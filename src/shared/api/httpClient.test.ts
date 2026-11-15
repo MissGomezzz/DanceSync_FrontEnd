@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setAccessTokenProvider } from '../lib/authSession'
 import { env } from '../lib/env'
-import { HttpError, httpClient } from './httpClient'
+import { HttpError, httpClient, RateLimitedError } from './httpClient'
 
 let fetchMock: ReturnType<typeof vi.fn>
 
@@ -60,5 +60,22 @@ describe('httpClient authentication (SEG-1)', () => {
     const error = await httpClient.get('/api/matches/1').catch((e: unknown) => e)
     expect(error).toBeInstanceOf(HttpError)
     expect(error).toMatchObject({ status: 403 })
+  })
+})
+
+describe('httpClient rate limit (SEG-3)', () => {
+  it('turns a 429 into a RateLimitedError that says how long to wait', async () => {
+    fetchMock.mockImplementationOnce(
+      async () => new Response('{"code":"RATE_LIMITED"}', { status: 429, headers: { 'Retry-After': '7' } }),
+    )
+    const error = await httpClient.post('/api/rooms/ABC123/guest-token', {}, { anonymous: true }).catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(RateLimitedError)
+    expect(error).toBeInstanceOf(HttpError)
+    expect(error).toMatchObject({ status: 429, retryAfterSeconds: 7, message: 'Too many requests. Wait 7 s and try again.' })
+  })
+
+  it('waits at least one second when the server does not say how long', async () => {
+    fetchMock.mockImplementationOnce(async () => new Response('', { status: 429 }))
+    await expect(httpClient.get('/api/rooms/ABC123')).rejects.toMatchObject({ retryAfterSeconds: 1 })
   })
 })
