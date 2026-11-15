@@ -37,7 +37,7 @@ export function HomePage() {
     try {
       const room = await createRoom(name)
       if (room) {
-        navigate(`/rooms/${room.code}`)
+        void navigate(`/rooms/${room.code}`)
       }
     } finally {
       setCreating(false)
@@ -48,7 +48,7 @@ export function HomePage() {
     const code = joinCode.trim().toUpperCase()
     if (code.length === 0) return
     setDisplayName(name)
-    navigate(`/rooms/${code}`)
+    void navigate(`/rooms/${code}`)
   }
 
   return (
