@@ -55,6 +55,7 @@ function renderLobby() {
       <Routes>
         <Route path="/rooms/:roomCode" element={<RoomLobby roomCode="ROOM01" />} />
         <Route path="/home" element={<p>Home page</p>} />
+        <Route path="/battle/:roomCode" element={<p>Battle page</p>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -363,5 +364,14 @@ describe('after a rematch', () => {
 
     act(() => useRoomStore.getState().receiveRoom(lobby({ lastResult: tie })))
     expect(screen.getByRole('region', { name: 'Last battle' }).textContent).toContain('It was a tie!')
+  })
+})
+
+describe('when the room is already in a battle', () => {
+  it('sends the player to the battle page', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby({ status: 'battling' })) })
+    renderLobby()
+
+    expect(await screen.findByText('Battle page')).toBeTruthy()
   })
 })

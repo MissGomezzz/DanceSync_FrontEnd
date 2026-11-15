@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Room } from '../shared/types'
 import { useAuthStore } from '../features/auth/store/authStore'
@@ -70,5 +70,43 @@ describe('HomePage', () => {
 
     expect(screen.queryByText('The host removed you from the room.')).toBeNull()
     expect(useRoomStore.getState().notice).toBeNull()
+  })
+
+  it('opens the new room after creating it', async () => {
+    const user = userEvent.setup()
+    useRoomStore.setState({
+      room: null,
+      createRoom: vi.fn().mockResolvedValue({ ...staleRoom, code: 'NEW123' }),
+    })
+    render(
+      <MemoryRouter initialEntries={['/home']}>
+        <Routes>
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/rooms/:roomCode" element={<p>Room page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Create room' }))
+
+    expect(await screen.findByText('Room page')).toBeTruthy()
+  })
+
+  it('goes to the room whose code was typed, in upper case', async () => {
+    const user = userEvent.setup()
+    useRoomStore.setState({ room: null })
+    render(
+      <MemoryRouter initialEntries={['/home']}>
+        <Routes>
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/rooms/:roomCode" element={<p>Room page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    await user.type(screen.getByLabelText('Room code'), 'abc123')
+    await user.click(screen.getByRole('button', { name: 'Join room' }))
+
+    expect(await screen.findByText('Room page')).toBeTruthy()
   })
 })
