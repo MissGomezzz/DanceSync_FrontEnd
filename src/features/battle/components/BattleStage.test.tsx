@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router'
+import userEvent from '@testing-library/user-event'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Battle, Room } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
@@ -149,5 +150,29 @@ describe('BattleStage song video errors', () => {
 
     expect(useRoomStore.getState().error).toBe('The song video could not be loaded. Check your connection.')
     expect(screen.queryByRole('note')).toBeNull()
+  })
+})
+
+describe('BattleStage leaving', () => {
+  it('goes home when the player leaves the room', async () => {
+    const user = userEvent.setup()
+    const room = battlingRoom({})
+    useRoomStore.setState({ room })
+    emitWithAck.mockImplementation((event: string) =>
+      event === 'room:join' ? Promise.resolve(room) : new Promise(() => {}),
+    )
+    render(
+      <MemoryRouter initialEntries={['/battle/ROOM01']}>
+        <Routes>
+          <Route path="/battle/:roomCode" element={<BattleStage roomCode="ROOM01" />} />
+          <Route path="/home" element={<p>Home page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await act(async () => {})
+
+    await user.click(screen.getByRole('button', { name: 'Leave room' }))
+
+    expect(await screen.findByText('Home page')).toBeTruthy()
   })
 })
