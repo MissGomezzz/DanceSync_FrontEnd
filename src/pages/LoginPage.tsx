@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import { defaultGuestName, useAuthStore } from '../features/auth/store/authStore'
-import { HttpError } from '../shared/api/httpClient'
+import { HttpError, RateLimitedError } from '../shared/api/httpClient'
 import { LoginPageView } from './LoginPageView'
 
 /** Plain-words reason a guest could not get a token for the room. */
 function guestJoinError(error: unknown): string {
+  if (error instanceof RateLimitedError) return error.message
   if (error instanceof HttpError && error.status === 404) return 'That room does not exist. Check the code.'
   if (error instanceof HttpError && error.status === 400) return 'Enter a display name of up to 32 characters.'
   return 'Could not join the room. Try again.'

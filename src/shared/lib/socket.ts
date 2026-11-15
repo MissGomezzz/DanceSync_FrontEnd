@@ -1,6 +1,6 @@
 import { io, type Socket } from 'socket.io-client'
 import { getAccessToken, onSessionChange } from './authSession'
-import { useConnectionStore } from './connectionStatus'
+import { remainingBlockMs, useConnectionStore } from './connectionStatus'
 import { env } from './env'
 
 /**
@@ -34,12 +34,39 @@ export const socket: Socket = io(env.wsUrl, {
 
 /** `connect_error` message of a handshake refused for lack of a valid token. */
 export const UNAUTHORIZED = 'UNAUTHORIZED'
+/** SEG-3: `connect_error` message (and error code) while the server refuses this client for flooding. */
+export const BLOCKED = 'BLOCKED'
+/** How long the "slow down" notice stays after the server drops some events (SEG-3). */
+export const SLOW_DOWN_NOTICE_MS = 4000
+/** Used when the server does not say how long a block lasts. */
+const DEFAULT_BLOCK_MS = 30_000
 
-const setConnectionStatus = useConnectionStore.getState().setStatus
+/** What the user reads while blocked, with the seconds left. */
+export function blockedMessage(remainingMs: number): string {
+  return `You sent too many actions too fast. Try again in ${Math.max(1, Math.ceil(remainingMs / 1000))} s.`
+}
+
+const connection = useConnectionStore.getState()
+const setConnectionStatus = connection.setStatus
 socket.on('connect', () => setConnectionStatus('connected'))
 // socket.io-client keeps retrying after both events, so they mean "reconnecting", not "gave up".
-socket.on('disconnect', () => setConnectionStatus('disconnected'))
-socket.on('connect_error', () => setConnectionStatus('disconnected'))
+socket.on('disconnect', () => {
+  // A block closes the connection right after telling why: keep showing the block.
+  if (useConnectionStore.getState().status !== 'blocked') setConnectionStatus('disconnected')
+})
+socket.on('connect_error', (error: Error & { data?: { retryAfterMs?: number } }) => {
+  if (error?.message === BLOCKED) connection.setBlocked(error.data?.retryAfterMs ?? DEFAULT_BLOCK_MS)
+  else setConnectionStatus('disconnected')
+})
+
+// SEG-3, early feedback: the server dropped some events, or blocked this client and closed the connection.
+socket.on('rate:limited', () => connection.setSlowDown(SLOW_DOWN_NOTICE_MS))
+socket.on('rate:blocked', (notice?: { retryAfterMs?: number }) => {
+  const retryAfterMs = notice?.retryAfterMs ?? DEFAULT_BLOCK_MS
+  connection.setBlocked(retryAfterMs)
+  // A connection closed by the server is never retried by socket.io-client: come back when the block ends.
+  setTimeout(() => connectSocket(), retryAfterMs + 500)
+})
 
 // A connection belongs to the identity of its handshake: after a sign-in, a
 // sign-out or a new guest token it is closed, and the next use reconnects as
@@ -51,7 +78,7 @@ onSessionChange(() => {
 /** Connects the singleton socket when it is not already connected. */
 export function connectSocket(): Socket {
   if (!socket.connected && !socket.active) {
-    setConnectionStatus('connecting')
+    if (useConnectionStore.getState().status !== 'blocked') setConnectionStatus('connecting')
     socket.connect()
   }
   return socket
@@ -79,11 +106,19 @@ type AckResponse<T> = { ok: true; data: T } | { ok: false; error: { code: string
  * code TIMEOUT when no acknowledgement arrives within `timeoutMs` (for example
  * while the connection is down: the emit stays buffered but the caller is freed),
  * or at once with code UNAUTHORIZED when the server refuses the connection
- * because the session has no valid token.
+ * because the session has no valid token, or with code BLOCKED while the server
+ * refuses this client for sending too many events (SEG-3): then nothing is sent.
  */
 export function emitWithAck<T>(event: string, payload: unknown, timeoutMs = ACK_TIMEOUT_MS): Promise<T> {
+  const blockedForMs = remainingBlockMs()
+  if (blockedForMs > 0) return Promise.reject(new SocketDomainError(BLOCKED, blockedMessage(blockedForMs)))
   return new Promise<T>((resolve, reject) => {
-    const onConnectError = (error: Error) => {
+    const onConnectError = (error: Error & { data?: { retryAfterMs?: number } }) => {
+      if (error.message === BLOCKED) {
+        socket.off('connect_error', onConnectError)
+        reject(new SocketDomainError(BLOCKED, blockedMessage(error.data?.retryAfterMs ?? DEFAULT_BLOCK_MS)))
+        return
+      }
       if (error.message !== UNAUTHORIZED) return
       socket.off('connect_error', onConnectError)
       reject(new SocketDomainError(UNAUTHORIZED, 'Your session is not valid any more. Sign in or join again.'))
