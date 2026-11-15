@@ -8,6 +8,7 @@ import {
   signInWithEntra,
   signOutOfEntra,
 } from '../lib/msalClient'
+import { isDevLoginEnabled, loadDevGrant, requestDevGrant, storeDevGrant, type DevGrant } from '../lib/devLogin'
 
 /**
  * The player as the backend knows them. The id is never chosen here: it is the
@@ -92,6 +93,8 @@ function storeDisplayName(displayName: string): void {
 }
 
 let guestGrant: GuestGrant | null = loadGuestGrant()
+/** Local testing only (see lib/devLogin): a signed-in user whose token came from the fake Entra ID. */
+let devGrant: DevGrant | null = loadDevGrant()
 
 function guestState(grant: GuestGrant): Pick<AuthState, 'identity' | 'session'> {
   return {
@@ -112,6 +115,8 @@ interface AuthState {
   initialize: () => Promise<void>
   /** Sends the browser to the Microsoft sign-in page. */
   signIn: () => Promise<void>
+  /** Local testing only (vite dev + VITE_DEV_LOGIN_URL): signs in as a test user of the fake Entra ID. */
+  signInForLocalTest: (oid: string, name: string) => Promise<void>
   signOut: () => Promise<void>
   /**
    * Asks the server for a guest token for `roomCode`. Rejects when the room
@@ -128,6 +133,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   ...(guestGrant ? guestState(guestGrant) : { identity: null, session: null }),
   canSignIn: isEntraConfigured(),
   initialize: async () => {
+    if (devGrant) {
+      guestGrant = null
+      storeGuestGrant(null)
+      set({ identity: { id: devGrant.oid, displayName: loadDisplayName() || devGrant.name }, session: { kind: 'user' } })
+      return
+    }
     try {
       const account = await restoreEntraAccount()
       if (!account) return
@@ -141,10 +152,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
   signIn: () => signInWithEntra(),
-  signOut: async () => {
-    const wasUser = get().session?.kind === 'user'
+  signInForLocalTest: async (oid, name) => {
+    // Unreachable in a production build (DEV is false there), so the bundler drops the rest.
+    if (!import.meta.env.DEV || !isDevLoginEnabled()) throw new Error('The local test login is not enabled')
+    const grant = await requestDevGrant(oid, name)
+    devGrant = grant
+    storeDevGrant(grant)
     guestGrant = null
     storeGuestGrant(null)
+    storeDisplayName(grant.name)
+    set({ identity: { id: grant.oid, displayName: grant.name }, session: { kind: 'user' } })
+    notifySessionChange()
+  },
+  signOut: async () => {
+    const wasUser = get().session?.kind === 'user' && devGrant === null
+    guestGrant = null
+    storeGuestGrant(null)
+    devGrant = null
+    storeDevGrant(null)
     set({ identity: null, session: null })
     notifySessionChange()
     // Also ends the Microsoft session, so the next visitor of this browser is not signed in.
@@ -159,6 +184,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     )
     guestGrant = grant
     storeGuestGrant(grant)
+    devGrant = null
+    storeDevGrant(null)
     const state = guestState(grant)
     set(state)
     notifySessionChange()
@@ -184,6 +211,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 // The transport layer asks here for the token to send; see shared/lib/authSession.
 setAccessTokenProvider(async () => {
   const { session } = useAuthStore.getState()
+  if (session?.kind === 'user' && devGrant) {
+    if (Date.parse(devGrant.expiresAt) > Date.now()) return devGrant.token
+    devGrant = null
+    storeDevGrant(null)
+    useAuthStore.setState({ identity: null, session: null })
+    return null
+  }
   if (session?.kind === 'user') return acquireEntraAccessToken()
   if (session?.kind === 'guest' && guestGrant) {
     if (!isExpired(guestGrant.expiresAt)) return guestGrant.token

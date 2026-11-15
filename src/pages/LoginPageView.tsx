@@ -1,6 +1,7 @@
 import { Button } from '../shared/ui/atoms/Button'
 import { Input } from '../shared/ui/atoms/Input'
 import { Logo } from '../shared/ui/atoms/Logo'
+import { LocalTestLogin } from '../features/auth/components/LocalTestLogin'
 
 interface LoginPageViewProps {
   /** False when the Entra ID application is not configured in this build. */
@@ -55,6 +56,9 @@ export function LoginPageView({
             : 'Microsoft sign-in is not configured for this site. You can still join a room as a guest.'}
         </p>
       </div>
+
+      {/* Removed from production builds: import.meta.env.DEV is false there. */}
+      {import.meta.env.DEV && <LocalTestLogin />}
 
       <div className="flex w-full max-w-sm items-center gap-3 text-xs uppercase tracking-wide text-ink-soft">
         <span className="h-px flex-1 bg-line" />

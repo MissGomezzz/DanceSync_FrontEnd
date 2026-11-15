@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import { useAdminAccessStore } from '../features/admin/store/adminAccessStore'
 import { defaultGuestName, useAuthStore } from '../features/auth/store/authStore'
 import {
   MAX_PLAYERS,
@@ -21,6 +22,9 @@ export function HomePage() {
   const roomError = useRoomError()
   const notice = useRoomNotice()
   const dismissNotice = useRoomStore((state) => state.dismissNotice)
+  const isUser = useAuthStore((state) => state.session?.kind === 'user')
+  const adminAccess = useAdminAccessStore((state) => state.access)
+  const checkAdmin = useAdminAccessStore((state) => state.check)
 
   const [name, setName] = useState(() => identity?.displayName ?? defaultGuestName())
   const [joinCode, setJoinCode] = useState('')
@@ -31,6 +35,11 @@ export function HomePage() {
     // player left it without "Leave room": free the seat instead of keeping it.
     if (useRoomStore.getState().room) void leaveRoom()
   }, [leaveRoom])
+
+  useEffect(() => {
+    // Only the backend knows who the admin is; the link appears when it says so.
+    if (isUser && adminAccess === 'unknown') void checkAdmin()
+  }, [isUser, adminAccess, checkAdmin])
 
   const handleCreateRoom = async () => {
     setCreating(true)
@@ -106,9 +115,19 @@ export function HomePage() {
         {roomError && <p className="text-sm font-medium text-rose-700">{roomError}</p>}
       </div>
 
-      <Button variant="ghost" className="text-xs" onClick={() => void signOut()}>
-        Sign out
-      </Button>
+      <div className="flex items-center gap-3">
+        {adminAccess === 'admin' && (
+          <Link
+            to="/admin"
+            className="rounded-lg bg-secondary-soft px-3 py-1.5 text-xs font-semibold text-secondary-strong hover:bg-secondary/20"
+          >
+            Admin console
+          </Link>
+        )}
+        <Button variant="ghost" className="text-xs" onClick={() => void signOut()}>
+          Sign out
+        </Button>
+      </div>
     </main>
   )
 }

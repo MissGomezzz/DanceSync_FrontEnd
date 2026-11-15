@@ -1,6 +1,8 @@
 import { createBrowserRouter, Navigate } from 'react-router'
 import { AppLayout } from './layouts/AppLayout'
 import { RequireRoomAccess, RequireUser } from '../features/auth/components/RouteGuards'
+import { RequireAdmin } from '../features/admin/components/RequireAdmin'
+import { AdminPage } from '../features/admin/pages/AdminPage'
 import { BattlePage } from '../features/battle/pages/BattlePage'
 import { RoomPage } from '../features/rooms/pages/RoomPage'
 import { HomePage } from '../pages/HomePage'
@@ -37,6 +39,15 @@ export const router = createBrowserRouter([
           <RequireRoomAccess>
             <BattlePage />
           </RequireRoomAccess>
+        ),
+      },
+      // SEG-2: the audit log and the alerts, for the single admin account.
+      {
+        path: '/admin',
+        element: (
+          <RequireAdmin>
+            <AdminPage />
+          </RequireAdmin>
         ),
       },
       { path: '*', element: <Navigate to="/home" replace /> },
