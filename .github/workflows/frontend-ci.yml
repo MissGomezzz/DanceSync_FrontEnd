@@ -26,6 +26,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # SonarCloud needs the full history to attribute new code and blame.
+          fetch-depth: 0
 
       # The pnpm version comes from "packageManager" in package.json.
       - name: Setup pnpm
@@ -43,8 +46,20 @@ jobs:
       - name: Lint
         run: pnpm lint
 
-      - name: Run tests
-        run: pnpm test
+      # Runs the unit tests and measures coverage (fails below 40 % of lines, see vite.config.ts).
+      - name: Run tests with coverage
+        run: pnpm test:coverage
 
       - name: Build
         run: pnpm build
+
+      # Static analysis (MAN-1). The step waits for the Quality Gate and fails the job if it is red.
+      # Secrets are not available to pull requests from forks, so the step is skipped there.
+      - name: SonarCloud scan
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: SonarSource/sonarqube-scan-action@v8.4.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
