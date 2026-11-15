@@ -13,6 +13,6 @@ export function useKickedRedirect(roomCode: string): void {
   useEffect(() => {
     if (kickedFrom !== roomCode.toUpperCase()) return
     useRoomStore.getState().acknowledgeKick()
-    navigate('/home', { replace: true })
+    void navigate('/home', { replace: true })
   }, [kickedFrom, roomCode, navigate])
 }

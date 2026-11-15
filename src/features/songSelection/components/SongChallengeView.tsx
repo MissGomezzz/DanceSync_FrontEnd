@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
 import { compareTyping, type CharStatus } from '../lib/typingFeedback'
 
 interface SongChallengeViewProps {
@@ -32,6 +32,14 @@ export function SongChallengeView({
   onTypedChange,
   onSubmit,
 }: SongChallengeViewProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // The view is remounted per challenge, so the keyboard focus lands on the field as soon as the
+  // phrase appears. Done here instead of with the autoFocus attribute (accessibility rule).
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
   const feedback = compareTyping(phrase, typed)
   const seconds = Math.ceil(remainingMs / 1000)
   const progress = totalMs > 0 ? Math.min(100, (remainingMs / totalMs) * 100) : 0
@@ -85,8 +93,7 @@ export function SongChallengeView({
 
       <form onSubmit={handleSubmit} className="flex gap-3">
         <input
-          // Remounted per challenge, so the keyboard focus lands here as soon as the phrase appears.
-          autoFocus
+          ref={inputRef}
           aria-label="Type the phrase"
           aria-invalid={feedback.hasError}
           value={typed}

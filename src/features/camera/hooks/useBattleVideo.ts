@@ -85,7 +85,7 @@ export function useBattleVideo(roomCode: string): BattleVideo {
     }
   }
 
-  const dancerVideos = dancerList.map(toVideo)
+const dancerVideos = dancerList.map((dancer, index) => toVideo(dancer, index))
 
   // Asking for the camera only makes sense while there is still dancing to do;
   // a finished battle keeps showing the streams but never prompts again.

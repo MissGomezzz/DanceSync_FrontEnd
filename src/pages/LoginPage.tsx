@@ -52,7 +52,7 @@ export function LoginPage() {
     try {
       // The server checks the room and answers with a token valid only for it.
       await joinAsGuest(code, guestName)
-      navigate(`/rooms/${code}`)
+      void navigate(`/rooms/${code}`)
     } catch (error) {
       setGuestError(guestJoinError(error))
     } finally {

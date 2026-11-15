@@ -62,7 +62,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   useEffect(() => {
     if (room?.code === roomCode && room.status !== 'waiting') {
       // Replace: Back from the battle must not land on a lobby that bounces forward again.
-      navigate(`/battle/${roomCode}`, { replace: true })
+      void navigate(`/battle/${roomCode}`, { replace: true })
     }
   }, [room, roomCode, navigate])
 
@@ -70,7 +70,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
     // Best effort: leaveRoom clears the local room at once, so a failed or slow
     // server answer never keeps the player on this page.
     void leaveRoom()
-    navigate('/home', { replace: true })
+    void navigate('/home', { replace: true })
   }
 
   const handleSelectRole = async (role: 'dancer' | 'spectator') => {

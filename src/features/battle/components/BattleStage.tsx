@@ -59,14 +59,14 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   useEffect(() => {
     // Back in the lobby: a rematch (or a room that was reset while away).
     if (room?.code === roomCode && room.status === 'waiting') {
-      navigate(`/rooms/${roomCode}`, { replace: true })
+      void navigate(`/rooms/${roomCode}`, { replace: true })
     }
   }, [room, roomCode, navigate])
 
   const handleLeave = () => {
     // Best effort, see RoomLobby: never wait for the server to leave the page.
     void leaveRoom()
-    navigate('/home', { replace: true })
+    void navigate('/home', { replace: true })
   }
 
   const handleRematch = async () => {
