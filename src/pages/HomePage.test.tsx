@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Room } from '../shared/types'
 import { useAuthStore } from '../features/auth/store/authStore'
 import { useRoomStore } from '../features/rooms/store/roomStore'
+import { useAdminAccessStore } from '../features/admin/store/adminAccessStore'
 import { HomePage } from './HomePage'
 
 const { emitWithAck } = vi.hoisted(() => ({ emitWithAck: vi.fn() }))
@@ -14,6 +15,12 @@ vi.mock('../shared/lib/socket', () => ({
   connectSocket: vi.fn(),
   socket: { on: vi.fn(), off: vi.fn(), io: { on: vi.fn() } },
   SocketDomainError: class extends Error {},
+}))
+
+const adminApi = vi.hoisted(() => ({ session: vi.fn() }))
+vi.mock('../features/admin/api/adminApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../features/admin/api/adminApi')>()),
+  adminApi,
 }))
 
 const staleRoom: Room = {
@@ -108,5 +115,34 @@ describe('HomePage', () => {
     await user.click(screen.getByRole('button', { name: 'Join room' }))
 
     expect(await screen.findByText('Room page')).toBeTruthy()
+  })
+
+  it('shows the admin console link only when the backend confirms the admin', async () => {
+    useRoomStore.setState({ room: null })
+    useAuthStore.setState({ identity: { id: 'oid-admin', displayName: 'Admin' }, session: { kind: 'user' } })
+    useAdminAccessStore.setState({ access: 'unknown' })
+    adminApi.session.mockResolvedValue({ admin: true })
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    )
+
+    expect((await screen.findByRole('link', { name: 'Admin console' })).getAttribute('href')).toBe('/admin')
+  })
+
+  it('shows no admin link to anyone else', async () => {
+    useRoomStore.setState({ room: null })
+    useAuthStore.setState({ identity: { id: 'oid-ana', displayName: 'Ana' }, session: { kind: 'user' } })
+    useAdminAccessStore.setState({ access: 'unknown' })
+    adminApi.session.mockRejectedValue(new Error('403'))
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    )
+
+    await vi.waitFor(() => expect(adminApi.session).toHaveBeenCalled())
+    expect(screen.queryByRole('link', { name: 'Admin console' })).toBeNull()
   })
 })
