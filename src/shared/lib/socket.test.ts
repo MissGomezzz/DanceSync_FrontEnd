@@ -8,7 +8,7 @@ type HandshakeAuth = (send: (auth: Record<string, unknown>) => void) => void
 
 const { fakeSocket, handlers, ioOptions } = vi.hoisted(() => {
   const handlers = new Map<string, Set<Handler>>()
-  const ioOptions: { auth?: HandshakeAuth } = {}
+  const ioOptions: { auth?: HandshakeAuth; transports?: string[]; tryAllTransports?: boolean } = {}
   const fakeSocket = {
     connected: true,
     active: true,
@@ -27,8 +27,10 @@ const { fakeSocket, handlers, ioOptions } = vi.hoisted(() => {
 })
 
 vi.mock('socket.io-client', () => ({
-  io: (_url: string, options: { auth?: HandshakeAuth }) => {
+  io: (_url: string, options: { auth?: HandshakeAuth; transports?: string[]; tryAllTransports?: boolean }) => {
     ioOptions.auth = options.auth
+    ioOptions.transports = options.transports
+    ioOptions.tryAllTransports = options.tryAllTransports
     return fakeSocket
   },
 }))
@@ -81,6 +83,16 @@ describe('emitWithAck', () => {
     const pending = emitWithAck('room:join', { roomCode: 'NOPE' })
     answerLastEmit(null, { ok: false, error: { code: 'ROOM_NOT_FOUND', message: 'Room not found' } })
     await expect(pending).rejects.toMatchObject({ code: 'ROOM_NOT_FOUND', message: 'Room not found' })
+  })
+})
+
+describe('transports (REN-1, ADR-02)', () => {
+  it('connects over WebSocket first and keeps long-polling only as a fallback', () => {
+    // WebSocket first: a normal connection makes no long-polling request, so the
+    // replicas behind the load balancer need no session affinity.
+    expect(ioOptions.transports).toEqual(['websocket', 'polling'])
+    // Without this, a failed WebSocket would not fall back to long-polling.
+    expect(ioOptions.tryAllTransports).toBe(true)
   })
 })
 

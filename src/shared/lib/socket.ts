@@ -8,15 +8,24 @@ import { env } from './env'
  * The connection is not opened automatically; call `connectSocket()`
  * once the user is about to join a room.
  */
-// Default transports (HTTP long-polling upgraded to WebSocket) are kept on
-// purpose: forcing 'websocket' only breaks in environments that instrument
-// the WebSocket global, and the gateway supports both transports.
+// Transports (REN-1, ADR-02): WebSocket first, HTTP long-polling only as a
+// fallback. The battle-service runs as several replicas behind a load balancer
+// without session affinity; a WebSocket lives on one replica from start to end,
+// while the requests of a long-polling session must all reach the replica that
+// created it. With the default order every connection began with a few polling
+// requests; now a normal connection makes none. `tryAllTransports` keeps the
+// reason the default was chosen before: where WebSocket is unavailable (for
+// example, an environment that instruments the WebSocket global), the client
+// falls back to long-polling instead of failing ('websocket' alone never
+// connects there). With several replicas that fallback needs session affinity.
 //
 // The access token travels in the Socket.IO handshake and is asked for on every
 // (re)connection, so a renewed token is used after a network drop. The server
 // validates it before accepting the connection and takes the player from it.
 export const socket: Socket = io(env.wsUrl, {
   path: '/socket.io',
+  transports: ['websocket', 'polling'],
+  tryAllTransports: true,
   autoConnect: false,
   auth: (send) => {
     void getAccessToken().then((token) => send(token ? { token } : {}))
