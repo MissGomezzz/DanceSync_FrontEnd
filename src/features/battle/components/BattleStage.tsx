@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { useServerTime } from '../../../shared/hooks/useCountdown'
 import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
@@ -31,9 +31,11 @@ import { StartCountdown } from './StartCountdown'
 
 interface BattleStageProps {
   roomCode: string
+  /** Panels the page wants right under the song video (see BattleStageView); null with a sidebar. */
+  songPanels?: ReactNode
 }
 
-export function BattleStage({ roomCode }: BattleStageProps) {
+export function BattleStage({ roomCode, songPanels = null }: BattleStageProps) {
   const navigate = useNavigate()
   const room = useRoom()
   const error = useRoomError()
@@ -149,6 +151,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
     <>
       <BattleStageView
         songVideo={songVideo}
+        songPanels={songPanels}
         roomCode={roomCode}
         room={inRoom ? room : null}
         error={error}

@@ -27,6 +27,11 @@ interface BattleStageViewProps {
   wordWins: Record<string, number>
   onLeave: () => void
   songVideo?: ReactNode
+  /**
+   * Panels shown right after the song video and before the camera tiles (the
+   * vote and the live ranking on a phone); null where the page has a sidebar for them.
+   */
+  songPanels?: ReactNode
   /** Final results dashboard once the battle finished (it carries its own leave button); null before. */
   results?: ReactNode
 }
@@ -48,12 +53,14 @@ export function BattleStageView({
   wordWins,
   onLeave,
   songVideo,
+  songPanels = null,
   results = null,
 }: BattleStageViewProps) {
   return (
-    <section className="mx-auto flex w-full max-w-[1600px] flex-col gap-3 p-3 sm:p-4">
-      <header className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-ink">Battle in room {roomCode}</h1>
+    // No padding of its own: the page already keeps the gutter (12 px on phones).
+    <section className="mx-auto flex w-full min-w-0 max-w-[1600px] flex-col gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <h1 className="text-xl font-bold text-ink sm:text-2xl">Battle in room {roomCode}</h1>
         {room && (
           <Badge tone={room.status === 'battling' ? 'success' : 'accent'}>{statusLabels[room.status]}</Badge>
         )}
@@ -73,7 +80,11 @@ export function BattleStageView({
 
       {wordRace}
 
-      <div className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(260px,1fr)]">
+      {/*
+        Side by side only from xl: between lg and xl the sidebar already takes
+        20rem, and a second split there left the song video too small.
+      */}
+      <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(260px,1fr)]">
         {/* Music video */}
         <div className="min-w-0">
           {songVideo ? (
@@ -87,8 +98,10 @@ export function BattleStageView({
           )}
         </div>
 
+        {songPanels && <div className="flex min-w-0 flex-col gap-3">{songPanels}</div>}
+
         {/* Dancer cameras */}
-        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 lg:content-start">
+        <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1 xl:content-start">
           {dancerVideos.length > 0 ? (
             dancerVideos.map(({ dancer, isMe, stream, placeholder }) => (
               <VideoTile
@@ -113,7 +126,7 @@ export function BattleStageView({
               />
             ))
           ) : (
-            <p className="text-sm text-ink-soft sm:col-span-2 lg:col-span-1">
+            <p className="text-sm text-ink-soft sm:col-span-2 xl:col-span-1">
               Waiting for the battle to start.
             </p>
           )}

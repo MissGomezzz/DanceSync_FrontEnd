@@ -78,24 +78,46 @@ function useServerInstant(
   payload: unknown,
   fallbackAt: string | null,
 ): ServerInstant | null {
-  const [state, setState] = useState(() => ({ payload, instant: toInstant(offsetMs, fallbackAt) }))
+  const [state, setState] = useState(() => ({ payload, instant: toInstant(offsetMs, payload, fallbackAt) }))
 
   if (state.payload !== payload) {
     // Derived during render (React's "adjusting state when a prop changes"), so the
     // first frame after a payload already uses the fresh value.
-    const next = { payload, instant: toInstant(offsetMs, fallbackAt) }
+    const next = { payload, instant: toInstant(offsetMs, payload, fallbackAt) }
     setState(next)
     return next.instant
   }
   return state.instant
 }
 
-function toInstant(offsetMs: number | null | undefined, fallbackAt: string | null): ServerInstant | null {
-  const receivedAt = readClock()
+/**
+ * When each payload object was first seen by any of these hooks. A relative
+ * value ("ends in 40 s") only means something at the moment its payload
+ * arrived, so a component that mounts later (a panel that moves when the
+ * layout changes) must anchor on that moment, not on its own mount.
+ */
+const payloadReceivedAt = new WeakMap<object, number>()
+
+function receivedAtOf(payload: unknown): number {
+  const now = readClock()
+  if (typeof payload !== 'object' || payload === null) return now
+  const known = payloadReceivedAt.get(payload)
+  if (known !== undefined) return known
+  payloadReceivedAt.set(payload, now)
+  return now
+}
+
+function toInstant(
+  offsetMs: number | null | undefined,
+  payload: unknown,
+  fallbackAt: string | null,
+): ServerInstant | null {
+  const receivedAt = receivedAtOf(payload)
   if (typeof offsetMs === 'number' && Number.isFinite(offsetMs)) return { at: receivedAt + offsetMs, receivedAt }
   if (fallbackAt) {
     const at = Date.parse(fallbackAt)
-    if (!Number.isNaN(at)) return { at: receivedAt + (at - Date.now()), receivedAt }
+    // An absolute date is converted against the wall clock as it reads right now.
+    if (!Number.isNaN(at)) return { at: readClock() + (at - Date.now()), receivedAt }
   }
   return null
 }
