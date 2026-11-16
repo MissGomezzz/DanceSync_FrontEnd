@@ -95,7 +95,14 @@ export function BattleStageView({
               {songVideo}
             </div>
           ) : (
-            <div className="flex aspect-video items-center justify-center rounded-2xl bg-black p-4 text-center text-sm text-white/80 shadow-soft">
+            // Once the battle is over there is no video to wait for: a full 16:9
+            // black box would only push the results off a phone screen.
+            <div
+              data-testid="song-placeholder"
+              className={`flex items-center justify-center rounded-2xl bg-black p-4 text-center text-sm text-white/80 shadow-soft ${
+                room?.status === 'finished' ? 'py-6 sm:aspect-video' : 'aspect-video'
+              }`}
+            >
               {songPlaceholder(room)}
             </div>
           )}

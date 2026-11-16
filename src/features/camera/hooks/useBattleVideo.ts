@@ -21,6 +21,9 @@ export interface BattleVideo {
   needsCameraPrompt: boolean
 }
 
+/** Tile text once the battle is over and a dancer has no stream: nothing is starting or connecting any more. */
+export const CAMERA_OFF = 'Camera off'
+
 function remotePlaceholder(name: string, state: PeerConnectionStatus | null, waitingForMyCamera: boolean): string {
   if (waitingForMyCamera) return `${name}'s camera will appear once yours is on.`
   // `failed` is only reported once every attempt was used up.
@@ -76,15 +79,20 @@ export function useBattleVideo(roomCode: string): BattleVideo {
   const connectionStates = usePeerConnectionStates(dancerIds)
 
   const waitingForMyCamera = isDancer && !publishedStream
+  const finished = room?.status === 'finished'
+  const placeholderFor = (dancer: Player, index: number, isMe: boolean): string => {
+    // A finished battle never prompts for the camera again, so "starting" would never come true.
+    if (finished) return CAMERA_OFF
+    if (isMe) return 'Starting your camera...'
+    return remotePlaceholder(dancer.displayName, connectionStates[index], waitingForMyCamera)
+  }
   const toVideo = (dancer: Player, index: number): DancerVideo => {
     const isMe = dancer.id === myId
     return {
       dancer,
       isMe,
       stream: isMe ? publishedStream : remoteStreams[index],
-      placeholder: isMe
-        ? 'Starting your camera...'
-        : remotePlaceholder(dancer.displayName, connectionStates[index], waitingForMyCamera),
+      placeholder: placeholderFor(dancer, index, isMe),
     }
   }
 

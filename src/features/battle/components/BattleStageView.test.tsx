@@ -146,6 +146,19 @@ describe('BattleStageView', () => {
     expect(screen.queryByText(/will appear when the battle starts/)).toBeNull()
   })
 
+  it('keeps the song area compact on phones once the battle is over', () => {
+    const { unmount } = renderStage([], {}, roomWith({}))
+    // Waiting for the video: the area holds the 16:9 space the player will take.
+    expect(screen.getByTestId('song-placeholder').className.split(' ')).toContain('aspect-video')
+    unmount()
+
+    renderStage([], {}, roomWith({ result: null }, 'finished'))
+    const finished = screen.getByTestId('song-placeholder').className.split(' ')
+    // No video will come: a short strip on phones, the usual box from sm up.
+    expect(finished).not.toContain('aspect-video')
+    expect(finished).toEqual(expect.arrayContaining(['py-6', 'sm:aspect-video']))
+  })
+
   it('says so when the battle song has no video', () => {
     const song = { id: 's1', title: 'Song', artist: 'Artist', durationSeconds: 90 }
     renderStage([], {}, roomWith({ song }))

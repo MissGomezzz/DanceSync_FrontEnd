@@ -21,8 +21,9 @@ export function BattlePage() {
 
   const code = roomCode.toUpperCase()
   const inBattle = room?.code === code && room.battle !== null && room.status !== 'waiting'
-  const scoreboard = inBattle && room.status === 'battling' ? <LiveScoreboard /> : null
-  const votes = inBattle ? <VotePanel /> : null
+  // The vote and the live ranking belong to a running battle: once it is over
+  // the results dashboard replaces them.
+  const battling = inBattle && room.status === 'battling'
 
   return (
     <main className="grid min-h-screen grid-cols-[minmax(0,1fr)] content-start gap-3 p-3 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -34,17 +35,21 @@ export function BattlePage() {
       <BattleStage
         roomCode={code}
         songPanels={
-          !hasSidebar && inBattle ? (
+          !hasSidebar && battling ? (
             <>
-              {votes}
-              {scoreboard}
+              <VotePanel />
+              <LiveScoreboard />
             </>
           ) : null
         }
       />
       <aside className="flex min-w-0 flex-col gap-3 sm:gap-6">
-        {hasSidebar && scoreboard}
-        {hasSidebar && votes}
+        {hasSidebar && battling && (
+          <>
+            <LiveScoreboard />
+            <VotePanel />
+          </>
+        )}
         {inBattle && <PlayersPanel />}
         <ChatPanel roomCode={code} />
       </aside>

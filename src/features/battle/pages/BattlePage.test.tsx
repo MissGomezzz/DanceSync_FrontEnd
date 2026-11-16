@@ -102,13 +102,19 @@ describe('BattlePage', () => {
     for (const panel of ['scoreboard', 'votes', 'players']) expect(screen.getByText(panel)).toBeTruthy()
   })
 
-  it('hides the live scoreboard once the battle is no longer running', () => {
+  it.each([
+    ['on a phone', false],
+    ['with a sidebar', true],
+  ])('hides the live scoreboard and the vote panel once the battle is over (%s)', (_label, wide) => {
+    stubSidebar(wide)
     useRoomStore.setState({ room: room({ status: 'finished' }) })
     renderAt('/battle/ROOM01')
 
+    // The results dashboard (inside the stage) replaces both.
     expect(screen.queryByText('scoreboard')).toBeNull()
-    expect(screen.getByText('votes')).toBeTruthy()
-    expect(screen.getByText('players')).toBeTruthy()
+    expect(screen.queryByText('votes')).toBeNull()
+    expect(texts(stage())).toEqual(['stage ROOM01'])
+    expect(texts(sidebar())).toEqual(['players', 'chat ROOM01'])
   })
 
   it('on a phone, puts the vote and the ranking under the song video, not in the column below', () => {
