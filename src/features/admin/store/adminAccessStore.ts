@@ -17,24 +17,33 @@ interface AdminAccessState {
 }
 
 let inFlight: Promise<void> | null = null
+/** Bumped by reset: a check started for the previous session must not write its answer for the next one. */
+let generation = 0
 
 export const useAdminAccessStore = create<AdminAccessState>((set) => ({
   access: 'unknown',
   check: () => {
     inFlight ??= (async () => {
+      const token = generation
       set({ access: 'checking' })
       try {
         const { admin } = await adminApi.session()
-        set({ access: admin ? 'admin' : 'denied' })
+        if (token === generation) set({ access: admin ? 'admin' : 'denied' })
       } catch (error) {
-        set({ access: error instanceof HttpError && (error.status === 401 || error.status === 403) ? 'denied' : 'error' })
+        if (token === generation) {
+          set({ access: error instanceof HttpError && (error.status === 401 || error.status === 403) ? 'denied' : 'error' })
+        }
       } finally {
-        inFlight = null
+        if (token === generation) inFlight = null
       }
     })()
     return inFlight
   },
-  reset: () => set({ access: 'unknown' }),
+  reset: () => {
+    generation += 1
+    inFlight = null
+    set({ access: 'unknown' })
+  },
 }))
 
 // Another account (or nobody) is signed in now: whatever was known about the old one is void.
