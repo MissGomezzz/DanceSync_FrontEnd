@@ -345,6 +345,92 @@ describe('starting the battle', () => {
   })
 })
 
+describe('explaining why the battle is not starting', () => {
+  const song = { id: 'song-1', title: 'Dance Monkey', artist: 'Tones and I', durationSeconds: 209 }
+  /** The viewer ("me") is a dancer; "rival" hosts the room. */
+  const asGuestOfRival = (ready: { me: boolean; rival: boolean }, overrides: Partial<Room> = {}) =>
+    lobby({
+      hostId: 'rival',
+      players: [
+        { id: 'me', displayName: 'Me', role: 'dancer', ready: ready.me },
+        { id: 'rival', displayName: 'Rival', role: 'dancer', ready: ready.rival },
+      ],
+      ...overrides,
+    })
+  /** The hint beside the footer buttons (other panels have live regions of their own). */
+  const hint = () => {
+    const footer = screen.getByRole('button', { name: 'Leave room' }).closest('footer') as HTMLElement
+    return within(footer).getByRole('status').textContent
+  }
+
+  it('shows the hint to a player who is not the host, not only to the host', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(asGuestOfRival({ me: true, rival: false })) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    // Not the host: there is no "Start battle" button, but the reason is still on screen.
+    expect(screen.queryByRole('button', { name: 'Start battle' })).toBeNull()
+    expect(hint()).toBe('Waiting for Rival to be ready.')
+  })
+
+  it('tells everyone when a chosen song cannot start because someone took back "ready"', async () => {
+    serverAnswers({
+      'room:join': () => Promise.resolve(asGuestOfRival({ me: true, rival: true }, { selectedSong: song })),
+    })
+    renderLobby()
+    await screen.findByText('Rival')
+    expect(hint()).toBe('Waiting for Rival to start the battle.')
+
+    act(() =>
+      useRoomStore.getState().receiveRoom(asGuestOfRival({ me: false, rival: true }, { selectedSong: song })),
+    )
+
+    expect(hint()).toBe("The song is chosen, but the battle can't start yet. Waiting for you to be ready.")
+  })
+
+  it('tells everyone when a chosen song cannot start because a dancer changed role', async () => {
+    serverAnswers({
+      'room:join': () =>
+        Promise.resolve(
+          lobby({
+            hostId: 'rival',
+            selectedSong: song,
+            players: [
+              { id: 'me', displayName: 'Me', role: 'spectator', ready: true },
+              { id: 'rival', displayName: 'Rival', role: 'dancer', ready: true },
+            ],
+          }),
+        ),
+    })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    expect(hint()).toBe(
+      'The song is chosen, but the battle can\'t start yet. At least 2 players must choose "Dance" to start.',
+    )
+  })
+
+  it('shows the host the same explanation next to the disabled "Start battle"', async () => {
+    serverAnswers({
+      'room:join': () =>
+        Promise.resolve(
+          lobby({
+            selectedSong: song,
+            players: [
+              { id: 'me', displayName: 'Me', role: 'dancer', ready: true },
+              { id: 'rival', displayName: 'Rival', role: 'dancer', ready: false },
+            ],
+          }),
+        ),
+    })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    expect(screen.getByRole('button', { name: 'Start battle' })).toHaveProperty('disabled', true)
+    expect(hint()).toBe("The song is chosen, but the battle can't start yet. Waiting for Rival to be ready.")
+  })
+})
+
 describe('removing a player', () => {
   it('lets the host remove another player after confirming, one request at a time', async () => {
     const user = userEvent.setup()

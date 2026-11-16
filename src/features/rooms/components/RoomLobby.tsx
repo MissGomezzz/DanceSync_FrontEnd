@@ -15,6 +15,7 @@ import {
   useRoomStore,
 } from '../store/roomStore'
 import { useKickedRedirect } from '../hooks/useKickedRedirect'
+import { startHint } from '../lib/startHint'
 import { ReadyButton } from './ReadyButton'
 import { RoleSelector } from './RoleSelector'
 import { RoomUnavailableView } from './RoomUnavailableView'
@@ -141,15 +142,20 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const choosingSong = songPhase === 'typing' || songPhase === 'choosing'
   const waitingFor = players.filter((p) => !p.ready)
   const canStart = isHost && dancerCount >= MIN_PLAYERS_TO_START && !choosingSong && waitingFor.length === 0
-  const startHint = !isHost
-    ? null
-    : dancerCount < MIN_PLAYERS_TO_START
-      ? `At least ${MIN_PLAYERS_TO_START} players must choose "Dance" to start.`
-      : choosingSong
-        ? 'Wait until the song has been chosen.'
-        : waitingFor.length > 0
-          ? `Waiting for ${waitingFor.map((p) => p.displayName).join(', ')} to be ready.`
-          : null
+  // Shown to everyone, not only the host: a player who took back "ready" after
+  // the song was chosen must see why the battle is not starting.
+  const hint = inRoom
+    ? startHint({
+        isHost,
+        myId,
+        hostName: players.find((p) => p.id === room.hostId)?.displayName ?? null,
+        dancerCount,
+        minDancers: MIN_PLAYERS_TO_START,
+        choosingSong,
+        songChosen: Boolean(room.selectedSong),
+        waitingFor,
+      })
+    : null
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:gap-6 sm:p-6">
@@ -183,7 +189,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
         isHost={isHost}
         canStart={canStart && !startingBattle}
         startingBattle={startingBattle}
-        startHint={startHint}
+        startHint={hint}
         error={inRoom ? error : null}
         onStartBattle={() => void handleStartBattle()}
         onLeave={handleLeave}
