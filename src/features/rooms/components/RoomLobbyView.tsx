@@ -161,6 +161,12 @@ interface KickControlProps {
 }
 
 const smallButton = 'px-2 py-1 text-xs'
+/**
+ * A text-only button inside a player card: on touch screens it keeps its 44 px
+ * target, but the negative margin stops that invisible height from making the
+ * card taller than its neighbours.
+ */
+const inlineTextButton = `${smallButton} pointer-coarse:-my-3`
 
 /** "Remove", then an inline "Confirm" / "Cancel", so a misclick never removes anyone. */
 function KickControl({ playerName, pending, onConfirm }: KickControlProps) {
@@ -170,7 +176,7 @@ function KickControl({ playerName, pending, onConfirm }: KickControlProps) {
     return (
       <Button
         variant="ghost"
-        className={smallButton}
+        className={inlineTextButton}
         // The name starts with the visible label, so voice control still matches "Remove".
         aria-label={`Remove ${playerName}`}
         disabled={pending}
@@ -190,7 +196,7 @@ function KickControl({ playerName, pending, onConfirm }: KickControlProps) {
       >
         {pending ? 'Removing...' : 'Confirm'}
       </Button>
-      <Button variant="ghost" className={smallButton} disabled={pending} onClick={() => setConfirming(false)}>
+      <Button variant="ghost" className={inlineTextButton} disabled={pending} onClick={() => setConfirming(false)}>
         Cancel
       </Button>
     </span>

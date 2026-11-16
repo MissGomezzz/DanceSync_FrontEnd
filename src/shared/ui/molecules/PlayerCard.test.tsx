@@ -33,11 +33,19 @@ describe('PlayerCard', () => {
     expect(screen.getByText('Host')).toBeTruthy()
   })
 
-  it('renders the actions after the badges', () => {
+  it('renders the actions after the badges, at the right end of their row', () => {
     render(<PlayerCard player={player()} actions={<button type="button">Remove</button>} />)
 
-    const remove = screen.getByRole('button', { name: 'Remove' })
-    expect(remove.previousElementSibling?.textContent).toBe('Dancer')
+    const actions = screen.getByRole('button', { name: 'Remove' }).parentElement as HTMLElement
+    expect(actions.previousElementSibling?.textContent).toBe('Dancer')
+    // Pushed to the end when the badges row wraps under the name and takes the full width.
+    expect(actions.className).toContain('ml-auto')
+    expect((actions.parentElement as HTMLElement).className.split(' ')).toContain('grow')
+  })
+
+  it('adds no empty actions slot to a card without actions', () => {
+    render(<PlayerCard player={player()} />)
+    expect(screen.getByText('Dancer').nextElementSibling).toBeNull()
   })
 
   it('wraps on a narrow screen and truncates a long name instead of overflowing', () => {
@@ -50,5 +58,7 @@ describe('PlayerCard', () => {
     // The full name stays reachable when it is cut.
     expect(name.getAttribute('title')).toBe(longName)
     expect(name.parentElement?.className).toContain('flex-wrap')
+    // A tight gap between the name row and the wrapped badges row.
+    expect(name.parentElement?.className.split(' ')).toContain('gap-y-1')
   })
 })

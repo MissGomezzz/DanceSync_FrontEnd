@@ -459,6 +459,16 @@ describe('removing a player', () => {
     expect(screen.queryByText('Rival')).toBeNull()
   })
 
+  it('keeps the 44 px touch target of "Remove" from making the card taller', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    const remove = screen.getByRole('button', { name: 'Remove Rival' })
+    expect(remove.className).toContain('pointer-coarse:min-h-11')
+    expect(remove.className).toContain('pointer-coarse:-my-3')
+  })
+
   it('can be cancelled', async () => {
     const user = userEvent.setup()
     serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
