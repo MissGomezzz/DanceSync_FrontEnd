@@ -142,6 +142,26 @@ describe('MatchResults', () => {
     expect(await screen.findByText('The results could not be loaded.')).toBeTruthy()
   })
 
+  it('fits a phone without scrolling sideways: no minimum width, the Gap column gives way', () => {
+    const longName = 'Maximiliano Alejandro'
+    const standings = [standing('a', longName, 2, 1, 1), standing('b', 'Ben', 1, 0, 2)]
+    render(<MatchResults room={finishedRoom({ result: { standings, winnerId: 'a' } })} myId={null} />)
+
+    const table = screen.getByRole('table')
+    expect(table.className).toContain('table-fixed')
+    expect(table.className).not.toContain('min-w-')
+    expect(table.parentElement?.className).not.toContain('overflow-x-auto')
+    expect(within(table).getByText(longName).className).toContain('truncate')
+
+    const gap = within(table).getByRole('columnheader', { name: 'Gap' })
+    expect(gap.className).toContain('hidden')
+    expect(gap.className).toContain('@md:table-cell')
+    expect(tableRows().map((row) => row.querySelectorAll('td')[5].className.includes('hidden'))).toEqual([true, true])
+    for (const header of ['Rank', 'Dancer', 'Votes', 'Words', 'Score']) {
+      expect(within(table).getByRole('columnheader', { name: header }).className).not.toContain('hidden')
+    }
+  })
+
   it('renders the actions it is given', () => {
     render(
       <MatchResults

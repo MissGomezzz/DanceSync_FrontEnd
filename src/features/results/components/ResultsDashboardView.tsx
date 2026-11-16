@@ -40,7 +40,8 @@ export function ResultsDashboardView({
   return (
     <section
       aria-labelledby="results-heading"
-      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 shadow-soft"
+      // A container: the table drops its last column by the width of the dashboard itself.
+      className="@container flex flex-col gap-4 rounded-2xl border border-line bg-surface p-3 shadow-soft sm:p-4"
     >
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="results-heading" className="text-lg font-bold text-ink">
@@ -72,7 +73,7 @@ function Results({ standings, winnerId, myId }: { standings: Standing[]; winnerI
   const winner = standings.find((s) => s.dancerId === winnerId)
   const topScore = Math.max(...standings.map((s) => s.score))
   const you = (id: string) =>
-    id === myId ? <span className="ml-1 text-xs font-semibold text-accent-strong">(you)</span> : null
+    id === myId ? <span className="ml-1 shrink-0 text-xs font-semibold text-accent-strong">(you)</span> : null
 
   return (
     <>
@@ -106,58 +107,62 @@ function Results({ standings, winnerId, myId }: { standings: Standing[]; winnerI
         })}
       </ol>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[28rem] text-sm">
-          <caption className="sr-only">Final ranking</caption>
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wide text-ink-soft">
-              <th scope="col" className="px-2 py-1 font-medium">
-                Rank
-              </th>
-              <th scope="col" className="px-2 py-1 font-medium">
-                Dancer
-              </th>
-              <th scope="col" className="px-2 py-1 text-right font-medium">
-                Votes
-              </th>
-              <th scope="col" className="px-2 py-1 text-right font-medium">
-                Words
-              </th>
-              <th scope="col" className="px-2 py-1 text-right font-medium">
-                Score
-              </th>
-              <th scope="col" className="px-2 py-1 text-right font-medium">
-                Gap
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {standings.map((standing) => {
-              const leader = leaders.has(standing.dancerId)
-              const gap = topScore - standing.score
-              return (
-                <tr
-                  key={standing.dancerId}
-                  data-winner={leader}
-                  className={`border-t border-line ${leader ? 'bg-sun-soft font-semibold text-sun-strong' : 'text-ink'}`}
-                >
-                  <td className="px-2 py-2">{ordinal(standing.rank)}</td>
-                  <td className="px-2 py-2">
-                    {standing.displayName}
+      {/* Fixed numeric columns and a truncating name: the table fits a phone without scrolling sideways. */}
+      <table className="w-full table-fixed text-sm">
+        <caption className="sr-only">Final ranking</caption>
+        <thead>
+          <tr className="text-left text-xs uppercase tracking-wide text-ink-soft">
+            <th scope="col" className="w-12 py-1 pr-1 pl-2 font-medium">
+              Rank
+            </th>
+            <th scope="col" className="px-2 py-1 font-medium">
+              Dancer
+            </th>
+            <th scope="col" className="w-14 px-1 py-1 text-right font-medium">
+              Votes
+            </th>
+            <th scope="col" className="w-14 px-1 py-1 text-right font-medium">
+              Words
+            </th>
+            <th scope="col" className="w-16 px-2 py-1 text-right font-medium">
+              Score
+            </th>
+            {/* The gap is the score again, relative to the leader: shown only when there is room. */}
+            <th scope="col" className="hidden w-20 px-2 py-1 text-right font-medium @md:table-cell">
+              Gap
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((standing) => {
+            const leader = leaders.has(standing.dancerId)
+            const gap = topScore - standing.score
+            return (
+              <tr
+                key={standing.dancerId}
+                data-winner={leader}
+                className={`border-t border-line ${leader ? 'bg-sun-soft font-semibold text-sun-strong' : 'text-ink'}`}
+              >
+                <td className="py-2 pr-1 pl-2">{ordinal(standing.rank)}</td>
+                <td className="px-2 py-2">
+                  <span className="flex min-w-0 items-center">
+                    <span className="truncate" title={standing.displayName}>
+                      {standing.displayName}
+                    </span>
                     {you(standing.dancerId)}
-                  </td>
-                  <td className="px-2 py-2 text-right tabular-nums">{standing.votes}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{standing.wordsWon}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{standing.score}</td>
-                  <td className="px-2 py-2 text-right tabular-nums text-ink-muted">
-                    {gap === 0 ? 'Leader' : `−${gap} pts`}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+                  </span>
+                </td>
+                <td className="px-1 py-2 text-right tabular-nums">{standing.votes}</td>
+                <td className="px-1 py-2 text-right tabular-nums">{standing.wordsWon}</td>
+                <td className="px-2 py-2 text-right tabular-nums">{standing.score}</td>
+                <td className="hidden px-2 py-2 text-right tabular-nums text-ink-muted @md:table-cell">
+                  {gap === 0 ? 'Leader' : `−${gap} pts`}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </>
   )
 }
