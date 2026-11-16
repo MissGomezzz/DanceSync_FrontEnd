@@ -68,6 +68,8 @@ export function SongPickerView({
                 variant="secondary"
                 className="w-full flex-col items-start! text-left"
                 disabled={pendingSongId !== null}
+                // Two stacked lines of text read as one run-on name (or none); say it in full.
+                aria-label={`${song.title} by ${song.artist}, ${formatDuration(song.durationSeconds)}`}
                 aria-busy={pendingSongId === song.id}
                 onClick={() => onChoose(song.id)}
               >
