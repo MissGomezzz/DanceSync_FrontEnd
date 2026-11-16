@@ -85,6 +85,22 @@ describe('useBattleVideo', () => {
     expect(c.stream).toBe(streamC)
   })
 
+  it('tells a connection being retried from one that was given up', () => {
+    useAuthStore.setState({ identity: { id: 'fan', displayName: 'FAN' } })
+    const { result } = renderHook(() => useBattleVideo('ROOM01'))
+
+    act(() => {
+      usePeerStore.getState().setConnectionState('a', 'retrying')
+      usePeerStore.getState().setConnectionState('b', 'disconnected')
+      usePeerStore.getState().setConnectionState('c', 'failed')
+    })
+
+    const [a, b, c] = result.current.dancerVideos
+    expect(a.placeholder).toBe("Reconnecting to A's camera...")
+    expect(b.placeholder).toBe("Reconnecting to B's camera...")
+    expect(c.placeholder).toBe("Could not connect to C's camera.")
+  })
+
   it('shows the local preview in the local dancer tile among the others', () => {
     const mine = fakeStream('mine')
     useAuthStore.setState({ identity: { id: 'b', displayName: 'B' } })
@@ -109,6 +125,43 @@ describe('useBattleVideo', () => {
     })
     rerender()
     expect(result.current.needsCameraPrompt).toBe(false)
+  })
+
+  it('says "Camera off" for every dancer without a stream once the battle is over', () => {
+    const finished = (): Room => ({
+      ...battleRoom(),
+      status: 'finished',
+      battle: { ...battleRoom().battle!, finishedAt: NOW },
+    })
+    // A dancer whose camera never started: nothing is "starting" or "will appear" any more.
+    useAuthStore.setState({ identity: { id: 'b', displayName: 'B' } })
+    useCameraStore.setState({ localStream: null, status: 'prompt' })
+    const { result, rerender } = renderHook(() => useBattleVideo('ROOM01'))
+    expect(result.current.dancerVideos.map((v) => v.placeholder)).toEqual([
+      "A's camera will appear once yours is on.",
+      'Starting your camera...',
+      "C's camera will appear once yours is on.",
+    ])
+
+    act(() => useRoomStore.setState({ room: finished() }))
+    rerender()
+
+    expect(result.current.dancerVideos.map((v) => v.placeholder)).toEqual(['Camera off', 'Camera off', 'Camera off'])
+    expect(result.current.needsCameraPrompt).toBe(false)
+  })
+
+  it('keeps showing the streams that are still up after the battle', () => {
+    useAuthStore.setState({ identity: { id: 'fan', displayName: 'FAN' } })
+    useRoomStore.setState({ room: { ...battleRoom(), status: 'finished' } })
+    const { result } = renderHook(() => useBattleVideo('ROOM01'))
+    const streamC = fakeStream('c')
+
+    act(() => usePeerStore.getState().setRemoteStream('c', streamC))
+
+    const [a, , c] = result.current.dancerVideos
+    expect(c.stream).toBe(streamC)
+    expect(a.stream).toBeNull()
+    expect(a.placeholder).toBe('Camera off')
   })
 
   it('is empty before the battle starts', () => {

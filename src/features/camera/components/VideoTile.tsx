@@ -27,8 +27,13 @@ export function VideoTile({ stream, label, mirrored = false, placeholder, badges
 
   return (
     <figure className="flex flex-col overflow-hidden rounded-2xl border-2 border-secondary/25 bg-black shadow-soft">
-      {/* object-contain keeps the whole dancer in frame whatever the camera's aspect ratio. */}
-      <div className="relative aspect-video bg-black">
+      {/*
+        16:9, except under an overlay (the camera prompt): its text can need more
+        height than that on a phone, so there 16:9 is only the minimum (a spacer in
+        the same grid cell) and the tile grows with the overlay.
+      */}
+      <div className={`relative bg-black ${overlay ? 'grid' : 'aspect-video'}`}>
+        {/* object-contain keeps the whole dancer in frame whatever the camera's aspect ratio. */}
         <video
           ref={videoRef}
           autoPlay
@@ -37,12 +42,22 @@ export function VideoTile({ stream, label, mirrored = false, placeholder, badges
           aria-label={`${label} camera`}
           className={`h-full w-full object-contain ${mirrored ? '-scale-x-100' : ''} ${showVideo ? '' : 'hidden'}`}
         />
-        {overlay ??
-          (!showVideo && (
+        {overlay ? (
+          <>
+            {/* self-start: stretched to a taller row, the ratio would widen the spacer past the tile. */}
+            <div aria-hidden className="col-start-1 row-start-1 aspect-video w-full self-start" />
+            {/* The bottom padding keeps the overlay clear of the name row drawn over the tile. */}
+            <div data-testid="tile-overlay" className="col-start-1 row-start-1 min-w-0 pb-14">
+              {overlay}
+            </div>
+          </>
+        ) : (
+          !showVideo && (
             <div className="absolute inset-0 flex items-center justify-center p-4 pb-14 text-center text-sm text-white/75">
               {placeholder}
             </div>
-          ))}
+          )
+        )}
         {/* Drawn over the video: a dark pill and a text shadow keep the name readable on any picture.
             It lets clicks through, so the camera prompt underneath stays usable. */}
         <figcaption className="pointer-events-none absolute inset-x-0 bottom-0 z-(--layer-tile-tags) flex items-end justify-between gap-2 bg-linear-to-t from-black/70 to-transparent p-3">

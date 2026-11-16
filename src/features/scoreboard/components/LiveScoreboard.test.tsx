@@ -167,6 +167,28 @@ describe('LiveScoreboard', () => {
     expect(screen.queryByText(/^[+−]\d/)).toBeNull()
   })
 
+  it('fits a narrow panel: fixed columns, a truncated name and no Words column', () => {
+    const longName = 'Maximiliano Alejandro'
+    mount(battlingRoom([standing('a', longName, 2, 1, 1), standing('b', 'Ben', 1, 0, 2)]))
+
+    expect(screen.getByRole('table').className).toContain('table-fixed')
+    const name = within(rowOf(longName)).getByText(longName)
+    expect(name.className).toContain('truncate')
+    expect(name.getAttribute('title')).toBe(longName)
+
+    // Hidden until the panel itself (not the window) is wide enough.
+    const words = screen.getByRole('columnheader', { name: 'Words' })
+    expect(words.className).toContain('hidden')
+    expect(words.className).toContain('@sm:table-cell')
+    const wordsCell = rowOf('Ben').querySelectorAll('td')[3]
+    expect(wordsCell.className).toContain('hidden')
+    expect(wordsCell.className).toContain('@sm:table-cell')
+    // The columns that make the ranking readable always show.
+    for (const header of ['Rank', 'Dancer', 'Votes', 'Score']) {
+      expect(screen.getByRole('columnheader', { name: header }).className).not.toContain('hidden')
+    }
+  })
+
   it('marks the viewer’s own row', () => {
     useAuthStore.setState({ identity: { id: 'a', displayName: 'Ana' } })
     mount(battlingRoom([standing('a', 'Ana', 0, 0, 1), standing('b', 'Ben', 0, 0, 1)]))

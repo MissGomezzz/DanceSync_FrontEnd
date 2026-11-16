@@ -5,6 +5,7 @@ import { useRoom, useRoomStore } from '../../rooms/store/roomStore'
 import { createPeerSession } from '../lib/peerSession'
 import { useCameraStatus, useCameraStore, useLocalStream } from '../store/cameraStore'
 import { usePeerConnectionStates, useRemoteStreams } from '../store/peerStore'
+import type { PeerConnectionStatus } from '../types'
 
 export interface DancerVideo {
   dancer: Player
@@ -20,9 +21,14 @@ export interface BattleVideo {
   needsCameraPrompt: boolean
 }
 
-function remotePlaceholder(name: string, state: RTCPeerConnectionState | null, waitingForMyCamera: boolean): string {
+/** Tile text once the battle is over and a dancer has no stream: nothing is starting or connecting any more. */
+export const CAMERA_OFF = 'Camera off'
+
+function remotePlaceholder(name: string, state: PeerConnectionStatus | null, waitingForMyCamera: boolean): string {
   if (waitingForMyCamera) return `${name}'s camera will appear once yours is on.`
+  // `failed` is only reported once every attempt was used up.
   if (state === 'failed') return `Could not connect to ${name}'s camera.`
+  if (state === 'retrying' || state === 'disconnected') return `Reconnecting to ${name}'s camera...`
   if (state === 'new' || state === 'connecting') return `Connecting to ${name}'s camera...`
   return `Waiting for ${name}'s camera...`
 }
@@ -73,15 +79,20 @@ export function useBattleVideo(roomCode: string): BattleVideo {
   const connectionStates = usePeerConnectionStates(dancerIds)
 
   const waitingForMyCamera = isDancer && !publishedStream
+  const finished = room?.status === 'finished'
+  const placeholderFor = (dancer: Player, index: number, isMe: boolean): string => {
+    // A finished battle never prompts for the camera again, so "starting" would never come true.
+    if (finished) return CAMERA_OFF
+    if (isMe) return 'Starting your camera...'
+    return remotePlaceholder(dancer.displayName, connectionStates[index], waitingForMyCamera)
+  }
   const toVideo = (dancer: Player, index: number): DancerVideo => {
     const isMe = dancer.id === myId
     return {
       dancer,
       isMe,
       stream: isMe ? publishedStream : remoteStreams[index],
-      placeholder: isMe
-        ? 'Starting your camera...'
-        : remotePlaceholder(dancer.displayName, connectionStates[index], waitingForMyCamera),
+      placeholder: placeholderFor(dancer, index, isMe),
     }
   }
 

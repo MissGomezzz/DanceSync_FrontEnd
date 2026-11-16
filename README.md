@@ -90,11 +90,22 @@ spectators) watches it live. The stage shows one tile per dancer in a two-column
 - **Topology**: a full mesh of peer-to-peer connections. Dancers publish, spectators only receive, and
   spectators never connect to each other. Each dancer offers to each spectator; between any two dancers the
   one with the lexicographically smaller player id offers and a single connection carries video both ways.
-- **Signaling**: offers, answers, and ICE candidates travel over Socket.IO (`webrtc:ready`,
-  `webrtc:peer-ready`, `webrtc:signal`) through battle-service, which only validates room membership and
-  relays them. Media never passes through the server.
-- **STUN only**: the MVP uses `stun:stun.l.google.com:19302` and no TURN server, so peers behind strict or
-  symmetric NATs (some corporate or mobile networks) may fail to connect.
+- **Signaling**: offers and answers travel over Socket.IO (`webrtc:ready`, `webrtc:peer-ready`,
+  `webrtc:signal`) through battle-service, which only validates room membership and relays them. Media never
+  passes through the server. battle-service rate limits every socket (20 events per second, burst of 40) and
+  drops what goes over, so signaling is kept small: ICE candidates are not trickled, each side waits for the
+  gathering to finish (2 s at most) and sends one description with the candidates inside. Events leave one
+  at a time through a paced queue, and one the server dropped (`RATE_LIMITED`) is sent again after the
+  `retryAfterMs` of the `rate:limited` notice.
+- **Recovery**: a connection that fails, does not connect within 15 s, or stays disconnected for 5 s is
+  replaced, up to three times per peer (after 1 s, 3 s and 6 s); the tile shows "Reconnecting..." meanwhile
+  and "Could not connect" only when every attempt was used. The offerer offers again; the answerer asks for a
+  new offer by sending `webrtc:ready` again. After the socket reconnects the session announces itself again.
+- **ICE servers**: `stun:stun.l.google.com:19302` is always used. Peers behind strict or symmetric NATs
+  (some corporate or mobile networks) cannot connect with STUN alone and need a TURN relay: set
+  `VITE_TURN_URLS`, `VITE_TURN_USERNAME` and `VITE_TURN_CREDENTIAL` to add one. Malformed URLs and a relay
+  without both credentials are ignored. The values are compiled into the bundle and therefore public, so use
+  a credential that is only valid for the relay.
 - **Secure context required**: browsers only expose the camera on `https://` pages or on `localhost`.
   `http://localhost:5173` works; for other machines see [Testing from other machines on the
   LAN](#testing-from-other-machines-on-the-lan).
@@ -178,6 +189,9 @@ Copy `.env.example` to `.env` and adjust the values as needed. `.env` is ignored
 | `VITE_AZURE_CLIENT_ID` | Microsoft Entra ID application (client) id         | empty                   |
 | `VITE_AZURE_TENANT_ID` | Microsoft Entra ID tenant id                       | empty                   |
 | `VITE_AZURE_API_SCOPE` | Scope of the DanceSync API requested at sign-in    | `api://<client id>/access_as_user` |
+| `VITE_TURN_URLS`       | Comma separated TURN relay URLs (`turn:` / `turns:`) for the camera | empty (STUN only) |
+| `VITE_TURN_USERNAME`   | Username for the TURN relay                        | empty                   |
+| `VITE_TURN_CREDENTIAL` | Credential for the TURN relay                      | empty                   |
 
 Without the two Entra ID values "Sign in with Microsoft" is disabled and only guests can get in.
 

@@ -22,13 +22,13 @@ export function RoleSelector({ myRole, pending, onSelectDancer, onSelectSpectato
   const chosen = myRole === 'dancer' || myRole === 'spectator' ? myRole : null
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface shadow-soft p-6">
+    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-soft sm:p-6">
       <p className="text-sm text-ink-muted">
         {chosen
           ? `${roleLabels[chosen]} You can switch until the battle starts.`
           : 'Choose your role for this room:'}
       </p>
-      <div className="flex gap-3" role="group" aria-label="Your role">
+      <div className="flex flex-wrap gap-3" role="group" aria-label="Your role">
         <Button
           variant={chosen === 'dancer' ? 'primary' : 'secondary'}
           aria-pressed={chosen === 'dancer'}

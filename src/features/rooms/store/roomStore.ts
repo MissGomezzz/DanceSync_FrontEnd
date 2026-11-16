@@ -22,6 +22,15 @@ export const rematchErrorMessages: Record<string, string> = {
   ROOM_NOT_FINISHED: 'The battle is not over yet, so a rematch cannot start.',
 }
 
+/** Shown to a latecomer: the server only lets new players in while the room is in the lobby. */
+export const ROOM_IN_BATTLE_NOTICE =
+  "This room's battle is already in progress. Wait for the rematch or join another room."
+
+/** Plain-words explanation of each join rejection; anything else shows the server's message. */
+export const joinErrorMessages: Record<string, string> = {
+  ROOM_NOT_WAITING: ROOM_IN_BATTLE_NOTICE,
+}
+
 interface RoomState {
   room: Room | null
   error: string | null
@@ -173,7 +182,8 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     } catch (error) {
       // A failed rejoin (room closed while away) must not keep showing the stale room.
       const stale = get().room?.code === code
-      set({ joinError: toErrorMessage(error), ...(stale ? { room: null } : {}) })
+      const known = error instanceof SocketDomainError ? joinErrorMessages[error.code] : undefined
+      set({ joinError: known ?? toErrorMessage(error), ...(stale ? { room: null } : {}) })
       return null
     } finally {
       if (pendingJoinCode === code) pendingJoinCode = null

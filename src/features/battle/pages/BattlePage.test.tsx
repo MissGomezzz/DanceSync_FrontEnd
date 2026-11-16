@@ -1,12 +1,18 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Room } from '../../../shared/types'
 import { useRoomStore } from '../../rooms/store/roomStore'
 import { BattlePage } from './BattlePage'
 
 vi.mock('../components/BattleStage', () => ({
-  BattleStage: ({ roomCode }: { roomCode: string }) => <div>stage {roomCode}</div>,
+  BattleStage: ({ roomCode, songPanels }: { roomCode: string; songPanels?: ReactNode }) => (
+    <section aria-label="stage">
+      <p>stage {roomCode}</p>
+      {songPanels}
+    </section>
+  ),
 }))
 vi.mock('../components/PlayersPanel', () => ({ PlayersPanel: () => <div>players</div> }))
 vi.mock('../../chat/components/ChatPanel', () => ({
@@ -53,9 +59,33 @@ function renderAt(path: string) {
   )
 }
 
+/** A controllable window.matchMedia for the sidebar breakpoint; jsdom has none (the phone layout). */
+function stubSidebar(matches: boolean) {
+  const listeners = new Set<() => void>()
+  const media = {
+    matches,
+    addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+  }
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => media),
+  )
+  return (next: boolean) => {
+    media.matches = next
+    listeners.forEach((listener) => listener())
+  }
+}
+
+const stage = () => screen.getByRole('region', { name: 'stage' })
+const sidebar = () => screen.getByRole('complementary')
+const texts = (container: HTMLElement) => [...container.children].map((child) => child.textContent)
+
 beforeEach(() => {
   useRoomStore.setState({ room: null })
 })
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('BattlePage', () => {
   it('sends the user home without a room code', () => {
@@ -72,13 +102,59 @@ describe('BattlePage', () => {
     for (const panel of ['scoreboard', 'votes', 'players']) expect(screen.getByText(panel)).toBeTruthy()
   })
 
-  it('hides the live scoreboard once the battle is no longer running', () => {
+  it.each([
+    ['on a phone', false],
+    ['with a sidebar', true],
+  ])('hides the live scoreboard and the vote panel once the battle is over (%s)', (_label, wide) => {
+    stubSidebar(wide)
     useRoomStore.setState({ room: room({ status: 'finished' }) })
     renderAt('/battle/ROOM01')
 
+    // The results dashboard (inside the stage) replaces both.
     expect(screen.queryByText('scoreboard')).toBeNull()
-    expect(screen.getByText('votes')).toBeTruthy()
-    expect(screen.getByText('players')).toBeTruthy()
+    expect(screen.queryByText('votes')).toBeNull()
+    expect(texts(stage())).toEqual(['stage ROOM01'])
+    expect(texts(sidebar())).toEqual(['players', 'chat ROOM01'])
+  })
+
+  it('on a phone, puts the vote and the ranking under the song video, not in the column below', () => {
+    useRoomStore.setState({ room: room() })
+    renderAt('/battle/ROOM01')
+
+    // Inside the stage (which places them between the song video and the cameras), vote first.
+    expect(texts(stage())).toEqual(['stage ROOM01', 'votes', 'scoreboard'])
+    expect(texts(sidebar())).toEqual(['players', 'chat ROOM01'])
+  })
+
+  it('with a sidebar (lg and up), keeps the ranking and the vote at the top of the sidebar', () => {
+    stubSidebar(true)
+    useRoomStore.setState({ room: room() })
+    renderAt('/battle/ROOM01')
+
+    expect(texts(stage())).toEqual(['stage ROOM01'])
+    expect(texts(sidebar())).toEqual(['scoreboard', 'votes', 'players', 'chat ROOM01'])
+  })
+
+  it('moves the panels when the window crosses the sidebar breakpoint', () => {
+    const setSidebar = stubSidebar(false)
+    useRoomStore.setState({ room: room() })
+    renderAt('/battle/ROOM01')
+    expect(within(stage()).getByText('votes')).toBeTruthy()
+
+    act(() => setSidebar(true))
+
+    expect(within(stage()).queryByText('votes')).toBeNull()
+    expect(within(sidebar()).getByText('votes')).toBeTruthy()
+    // Each panel is on the page exactly once.
+    expect(screen.getAllByText('votes')).toHaveLength(1)
+    expect(screen.getAllByText('scoreboard')).toHaveLength(1)
+  })
+
+  it('uses the small gutter on phones', () => {
+    renderAt('/battle/ROOM01')
+
+    const main = screen.getByRole('main')
+    expect(main.className.split(' ')).toEqual(expect.arrayContaining(['p-3', 'sm:p-6']))
   })
 
   it.each([

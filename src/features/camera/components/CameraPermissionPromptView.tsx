@@ -13,7 +13,7 @@ export function CameraPermissionPromptView({ status, errorMessage, onEnable }: C
       role="region"
       aria-live="polite"
       aria-label="Camera permission"
-      className="flex h-full flex-col items-center justify-center gap-3 p-5 text-center"
+      className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center sm:p-5"
     >
       <PromptContent status={status} errorMessage={errorMessage} onEnable={onEnable} />
     </div>

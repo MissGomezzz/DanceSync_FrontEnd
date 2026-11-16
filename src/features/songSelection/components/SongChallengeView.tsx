@@ -61,7 +61,7 @@ export function SongChallengeView({
   return (
     <section
       aria-label="Song selection challenge"
-      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface shadow-soft p-6"
+      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 shadow-soft sm:p-6"
     >
       <header className="flex items-center justify-between gap-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
@@ -83,7 +83,7 @@ export function SongChallengeView({
         />
       </div>
 
-      <p data-testid="challenge-phrase" aria-label={phrase} className="select-none text-center font-mono text-3xl tracking-wide text-ink">
+      <p data-testid="challenge-phrase" aria-label={phrase} className="select-none text-center font-mono text-2xl tracking-wide text-ink sm:text-3xl">
         {feedback.chars.map((c, i) => (
           <span key={i} data-status={c.status} className={`rounded-sm ${charClasses[c.status]}`}>
             {c.char}
@@ -105,12 +105,12 @@ export function SongChallengeView({
           autoCapitalize="off"
           spellCheck={false}
           placeholder={canType ? 'Start typing...' : ''}
-          className={`flex-1 rounded-lg border bg-surface px-3 py-2 font-mono text-lg text-ink placeholder:text-ink-soft/70 focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 ${inputTone}`}
+          className={`min-w-0 flex-1 rounded-lg border bg-surface px-3 py-2 font-mono text-lg text-ink placeholder:text-ink-soft focus:ring-2 focus:ring-primary/25 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11 ${inputTone}`}
         />
         <button
           type="submit"
           disabled={!canType || submitting || typed.trim().length === 0}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-strong pointer-coarse:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
           Send
         </button>

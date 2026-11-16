@@ -60,6 +60,71 @@ describe('BattleStageView', () => {
     expect(tiles[0].parentElement?.className).toContain('sm:grid-cols-2')
   })
 
+  it('shows the song panels right after the song video and before the camera tiles', () => {
+    render(
+      <BattleStageView
+        roomCode="ROOM01"
+        room={null}
+        error={null}
+        dancerVideos={[video('a'), video('b')]}
+        cameraPrompt={null}
+        wordRace={null}
+        wordWins={{}}
+        onLeave={() => {}}
+        songVideo={<p>Song video</p>}
+        songPanels={<p>Vote panel</p>}
+      />,
+    )
+
+    const follows = (earlier: HTMLElement, later: HTMLElement) =>
+      Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING)
+    const panels = screen.getByText('Vote panel')
+    expect(follows(screen.getByText('Song video'), panels)).toBe(true)
+    expect(follows(panels, screen.getAllByRole('figure')[0])).toBe(true)
+  })
+
+  it('puts the song clock right under the song video, above the panels', () => {
+    render(
+      <BattleStageView
+        roomCode="ROOM01"
+        room={null}
+        error={null}
+        dancerVideos={[]}
+        cameraPrompt={null}
+        wordRace={null}
+        wordWins={{}}
+        onLeave={() => {}}
+        songVideo={<p>Song video</p>}
+        songTime={<p>1:23 left</p>}
+        songPanels={<p>Vote panel</p>}
+      />,
+    )
+
+    const clock = screen.getByText('1:23 left')
+    expect(clock.previousElementSibling?.textContent).toBe('Song video')
+    expect(clock.compareDocumentPosition(screen.getByText('Vote panel')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('renders no panel slot where the page has a sidebar', () => {
+    renderStage([video('a')])
+
+    const cameras = screen.getByRole('figure').parentElement as HTMLElement
+    // Only the song area and the cameras share the grid.
+    expect(cameras.parentElement?.children).toHaveLength(2)
+  })
+
+  it('splits the song and the cameras side by side only from xl, and adds no gutter of its own', () => {
+    const { container } = renderStage([video('a')])
+
+    const cameras = screen.getByRole('figure').parentElement as HTMLElement
+    const grid = cameras.parentElement as HTMLElement
+    expect(grid.className).toContain('xl:grid-cols-')
+    expect(grid.className).not.toContain('lg:grid-cols-')
+    expect(cameras.className).toContain('xl:grid-cols-1')
+    // The page owns the gutter: a second padding here wasted width on phones.
+    expect((container.firstElementChild as HTMLElement).className).not.toMatch(/(^|\s)(sm:)?p-\d/)
+  })
+
   it('mirrors only the local preview and shows each dancer their own word tally', () => {
     renderStage([video('a'), video('b', true), video('c')], { a: 2, b: 1, c: 0 })
 
@@ -79,6 +144,19 @@ describe('BattleStageView', () => {
 
     expect(screen.getByText('The battle is over.')).toBeTruthy()
     expect(screen.queryByText(/will appear when the battle starts/)).toBeNull()
+  })
+
+  it('keeps the song area compact on phones once the battle is over', () => {
+    const { unmount } = renderStage([], {}, roomWith({}))
+    // Waiting for the video: the area holds the 16:9 space the player will take.
+    expect(screen.getByTestId('song-placeholder').className.split(' ')).toContain('aspect-video')
+    unmount()
+
+    renderStage([], {}, roomWith({ result: null }, 'finished'))
+    const finished = screen.getByTestId('song-placeholder').className.split(' ')
+    // No video will come: a short strip on phones, the usual box from sm up.
+    expect(finished).not.toContain('aspect-video')
+    expect(finished).toEqual(expect.arrayContaining(['py-6', 'sm:aspect-video']))
   })
 
   it('says so when the battle song has no video', () => {

@@ -8,12 +8,14 @@ import { SongSelectionPanel } from '../../songSelection/components/SongSelection
 import {
   MAX_PLAYERS,
   MIN_PLAYERS_TO_START,
+  ROOM_IN_BATTLE_NOTICE,
   useRoom,
   useRoomError,
   useRoomJoinError,
   useRoomStore,
 } from '../store/roomStore'
 import { useKickedRedirect } from '../hooks/useKickedRedirect'
+import { startHint } from '../lib/startHint'
 import { ReadyButton } from './ReadyButton'
 import { RoleSelector } from './RoleSelector'
 import { RoomUnavailableView } from './RoomUnavailableView'
@@ -125,6 +127,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
       <RoomUnavailableView
         roomCode={roomCode}
         reason={joinError}
+        codeHint={joinError !== ROOM_IN_BATTLE_NOTICE}
         onBack={() => navigate('/home')}
         onRetry={() => setJoinAttempt((n) => n + 1)}
       />
@@ -139,33 +142,42 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
   const choosingSong = songPhase === 'typing' || songPhase === 'choosing'
   const waitingFor = players.filter((p) => !p.ready)
   const canStart = isHost && dancerCount >= MIN_PLAYERS_TO_START && !choosingSong && waitingFor.length === 0
-  const startHint = !isHost
-    ? null
-    : dancerCount < MIN_PLAYERS_TO_START
-      ? `At least ${MIN_PLAYERS_TO_START} players must choose "Dance" to start.`
-      : choosingSong
-        ? 'Wait until the song has been chosen.'
-        : waitingFor.length > 0
-          ? `Waiting for ${waitingFor.map((p) => p.displayName).join(', ')} to be ready.`
-          : null
+  // Shown to everyone, not only the host: a player who took back "ready" after
+  // the song was chosen must see why the battle is not starting.
+  const hint = inRoom
+    ? startHint({
+        isHost,
+        myId,
+        hostName: players.find((p) => p.id === room.hostId)?.displayName ?? null,
+        dancerCount,
+        minDancers: MIN_PLAYERS_TO_START,
+        choosingSong,
+        songChosen: Boolean(room.selectedSong),
+        waitingFor,
+      })
+    : null
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:gap-6 sm:p-6">
       <ConnectionBanner status={connection} />
-      {inRoom && (
-        <RoleSelector
-          myRole={me?.role}
-          pending={rolePending}
-          onSelectDancer={() => void handleSelectRole('dancer')}
-          onSelectSpectator={() => void handleSelectRole('spectator')}
-        />
-      )}
-      {inRoom && <ReadyButton ready={me?.ready === true} pending={readyPending} onToggle={() => void handleToggleReady()} />}
-      {inRoom && room.lastResult?.standings && room.lastResult.standings.length > 0 && (
-        <LastBattleCardView standings={room.lastResult.standings} winnerId={room.lastResult.winnerId} />
-      )}
-      {inRoom && <SongSelectionPanel room={room} />}
       <RoomLobbyView
+        controls={
+          inRoom ? (
+            <>
+              <RoleSelector
+                myRole={me?.role}
+                pending={rolePending}
+                onSelectDancer={() => void handleSelectRole('dancer')}
+                onSelectSpectator={() => void handleSelectRole('spectator')}
+              />
+              <ReadyButton ready={me?.ready === true} pending={readyPending} onToggle={() => void handleToggleReady()} />
+              {room.lastResult?.standings && room.lastResult.standings.length > 0 && (
+                <LastBattleCardView standings={room.lastResult.standings} winnerId={room.lastResult.winnerId} />
+              )}
+              <SongSelectionPanel room={room} />
+            </>
+          ) : null
+        }
         roomCode={roomCode}
         players={players}
         // room.dancers is only filled when the battle starts; in the lobby the
@@ -177,7 +189,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
         isHost={isHost}
         canStart={canStart && !startingBattle}
         startingBattle={startingBattle}
-        startHint={startHint}
+        startHint={hint}
         error={inRoom ? error : null}
         onStartBattle={() => void handleStartBattle()}
         onLeave={handleLeave}

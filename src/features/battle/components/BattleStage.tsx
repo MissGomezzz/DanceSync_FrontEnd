@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { useServerTime } from '../../../shared/hooks/useCountdown'
 import { useConnectionStatus } from '../../../shared/lib/connectionStatus'
@@ -14,20 +14,29 @@ import { useKickedRedirect } from '../../rooms/hooks/useKickedRedirect'
 import { EndAnnouncement } from '../../results/components/EndAnnouncement'
 import { MatchResults } from '../../results/components/MatchResults'
 import { useScoreboardSync } from '../../scoreboard/hooks/useScoreboardSync'
-import { useRoom, useRoomError, useRoomJoinError, useRoomStore } from '../../rooms/store/roomStore'
+import {
+  ROOM_IN_BATTLE_NOTICE,
+  useRoom,
+  useRoomError,
+  useRoomJoinError,
+  useRoomStore,
+} from '../../rooms/store/roomStore'
 import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
 import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
 import { useWordRaceWins } from '../../wordRace/store/wordRaceStore'
 import { SongPlayer, YOUTUBE_API_UNAVAILABLE } from '../../songSelection/components/SongPlayer'
 import { SongVideoNotice } from '../../songSelection/components/SongVideoNotice'
 import { BattleStageView } from './BattleStageView'
+import { SongTimeRemaining } from './SongTimeRemaining'
 import { StartCountdown } from './StartCountdown'
 
 interface BattleStageProps {
   roomCode: string
+  /** Panels the page wants right under the song video (see BattleStageView); null with a sidebar. */
+  songPanels?: ReactNode
 }
 
-export function BattleStage({ roomCode }: BattleStageProps) {
+export function BattleStage({ roomCode, songPanels = null }: BattleStageProps) {
   const navigate = useNavigate()
   const room = useRoom()
   const error = useRoomError()
@@ -83,12 +92,20 @@ export function BattleStage({ roomCode }: BattleStageProps) {
 
   const inRoom = room?.code === roomCode
   const battle = inRoom ? room.battle : null
+  const runningBattle = inRoom && room.status === 'battling' ? battle : null
   // Anchored on the local monotonic clock when each room payload arrives, so the
   // song starts in sync even when this device's wall clock is off.
   const songStartAt = useServerTime(battle?.startsInMs, battle, battle?.startedAt ?? null)
 
   if (!inRoom && joinError) {
-    return <RoomUnavailableView roomCode={roomCode} reason={joinError} onBack={() => navigate('/home')} />
+    return (
+      <RoomUnavailableView
+        roomCode={roomCode}
+        reason={joinError}
+        codeHint={joinError !== ROOM_IN_BATTLE_NOTICE}
+        onBack={() => navigate('/home')}
+      />
+    )
   }
   const song = battle?.song ?? null
   const videoId = inRoom && room.status === 'battling' ? (song?.youtubeId ?? null) : null
@@ -136,6 +153,9 @@ export function BattleStage({ roomCode }: BattleStageProps) {
     <>
       <BattleStageView
         songVideo={songVideo}
+        // Dancers have no vote panel countdown, so the song clock is here for everyone.
+        songTime={<SongTimeRemaining battle={runningBattle} />}
+        songPanels={songPanels}
         roomCode={roomCode}
         room={inRoom ? room : null}
         error={error}
@@ -148,7 +168,7 @@ export function BattleStage({ roomCode }: BattleStageProps) {
         results={results}
       />
       {/* Same start instant as the song player, so "Dance!" lands on the first beat. */}
-      <StartCountdown battle={inRoom && room.status === 'battling' ? battle : null} startAt={songStartAt} />
+      <StartCountdown battle={runningBattle} startAt={songStartAt} />
       <EndAnnouncement room={inRoom ? room : null} />
     </>
   )

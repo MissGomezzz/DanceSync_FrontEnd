@@ -54,7 +54,7 @@ export function SongSelectionPanel({ room }: SongSelectionPanelProps) {
   return (
     <section
       aria-label="Song"
-      className="flex flex-col gap-3 rounded-2xl border border-line bg-surface shadow-soft p-6"
+      className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-soft sm:p-6"
     >
       <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Song</h2>
       {room.selectedSong ? (

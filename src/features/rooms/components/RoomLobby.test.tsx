@@ -2,6 +2,7 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { SocketDomainError } from '../../../shared/lib/socket'
 import type { Room } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useRoomStore } from '../store/roomStore'
@@ -20,7 +21,13 @@ vi.mock('../../../shared/lib/socket', () => ({
     off: vi.fn(),
     io: { on: vi.fn() },
   },
-  SocketDomainError: class extends Error {},
+  SocketDomainError: class extends Error {
+    readonly code: string
+    constructor(code: string, message: string) {
+      super(message)
+      this.code = code
+    }
+  },
 }))
 
 const NOW = '2026-01-01T00:00:00.000Z'
@@ -77,11 +84,88 @@ describe('joining the room', () => {
 
     expect(await screen.findByText('Cannot join room ROOM01')).toBeTruthy()
     expect(screen.getByText('The server did not respond. Check your connection.')).toBeTruthy()
+    expect(screen.getByText(/Check the code with the room host/)).toBeTruthy()
 
     serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect((await screen.findAllByText('Rival')).length).toBeGreaterThan(0)
     expect(screen.queryByText('Cannot join room ROOM01')).toBeNull()
+  })
+})
+
+describe('joining a room whose battle already started', () => {
+  it('explains it in plain words, without the raw rejection or the "check the code" advice', async () => {
+    serverAnswers({
+      'room:join': () =>
+        Promise.reject(new SocketDomainError('ROOM_NOT_WAITING', 'Room ROOM01 is not accepting players')),
+    })
+    renderLobby()
+
+    expect(
+      await screen.findByText(
+        "This room's battle is already in progress. Wait for the rematch or join another room.",
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByText(/not accepting players/)).toBeNull()
+    // The code is right: the room exists, it is just busy.
+    expect(screen.queryByText(/Check the code/)).toBeNull()
+    // The latecomer can try again once the rematch takes the room back to the lobby.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
+  })
+})
+
+describe('the lobby layout', () => {
+  it('lists every player once, under the role they chose', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    expect(screen.getAllByText('Rival')).toHaveLength(1)
+    expect(screen.getAllByText('Me')).toHaveLength(1)
+    expect(within(screen.getByRole('list', { name: 'Dancers' })).getByText('Rival')).toBeTruthy()
+    expect(within(screen.getByRole('list', { name: 'Choosing role' })).getByText('Me')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Dancers (1)' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Spectators (0)' })).toBeTruthy()
+    expect(screen.getByText('No spectators yet.')).toBeTruthy()
+
+    // Once everyone has a role, the "Choosing role" group goes away.
+    act(() =>
+      useRoomStore.getState().receiveRoom(
+        lobby({
+          players: [
+            { id: 'me', displayName: 'Me', role: 'spectator' },
+            { id: 'rival', displayName: 'Rival', role: 'dancer' },
+          ],
+        }),
+      ),
+    )
+    expect(screen.queryByRole('heading', { name: /Choosing role/ })).toBeNull()
+    expect(within(screen.getByRole('list', { name: 'Spectators' })).getByText('Me')).toBeTruthy()
+    expect(screen.getAllByText('Me')).toHaveLength(1)
+  })
+
+  it('puts the room title above the role and ready controls', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    const title = screen.getByRole('heading', { name: 'Room ROOM01' })
+    const follows = (element: HTMLElement) =>
+      Boolean(title.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(screen.getByRole('group', { name: 'Your role' }))).toBe(true)
+    expect(follows(screen.getByRole('button', { name: "I'm ready" }))).toBe(true)
+    expect(follows(screen.getByRole('region', { name: 'Song' }))).toBe(true)
+  })
+
+  it('stacks the footer on phones, so the hint is not squeezed beside the buttons', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    const footer = screen.getByRole('button', { name: 'Leave room' }).closest('footer') as HTMLElement
+    expect(footer.className).toContain('flex-col')
+    expect(footer.className).toContain('sm:flex-row')
+    expect(within(footer).getByRole('status').textContent).toBe('At least 2 players must choose "Dance" to start.')
   })
 })
 
@@ -261,6 +345,92 @@ describe('starting the battle', () => {
   })
 })
 
+describe('explaining why the battle is not starting', () => {
+  const song = { id: 'song-1', title: 'Dance Monkey', artist: 'Tones and I', durationSeconds: 209 }
+  /** The viewer ("me") is a dancer; "rival" hosts the room. */
+  const asGuestOfRival = (ready: { me: boolean; rival: boolean }, overrides: Partial<Room> = {}) =>
+    lobby({
+      hostId: 'rival',
+      players: [
+        { id: 'me', displayName: 'Me', role: 'dancer', ready: ready.me },
+        { id: 'rival', displayName: 'Rival', role: 'dancer', ready: ready.rival },
+      ],
+      ...overrides,
+    })
+  /** The hint beside the footer buttons (other panels have live regions of their own). */
+  const hint = () => {
+    const footer = screen.getByRole('button', { name: 'Leave room' }).closest('footer') as HTMLElement
+    return within(footer).getByRole('status').textContent
+  }
+
+  it('shows the hint to a player who is not the host, not only to the host', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(asGuestOfRival({ me: true, rival: false })) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    // Not the host: there is no "Start battle" button, but the reason is still on screen.
+    expect(screen.queryByRole('button', { name: 'Start battle' })).toBeNull()
+    expect(hint()).toBe('Waiting for Rival to be ready.')
+  })
+
+  it('tells everyone when a chosen song cannot start because someone took back "ready"', async () => {
+    serverAnswers({
+      'room:join': () => Promise.resolve(asGuestOfRival({ me: true, rival: true }, { selectedSong: song })),
+    })
+    renderLobby()
+    await screen.findByText('Rival')
+    expect(hint()).toBe('Waiting for Rival to start the battle.')
+
+    act(() =>
+      useRoomStore.getState().receiveRoom(asGuestOfRival({ me: false, rival: true }, { selectedSong: song })),
+    )
+
+    expect(hint()).toBe("The song is chosen, but the battle can't start yet. Waiting for you to be ready.")
+  })
+
+  it('tells everyone when a chosen song cannot start because a dancer changed role', async () => {
+    serverAnswers({
+      'room:join': () =>
+        Promise.resolve(
+          lobby({
+            hostId: 'rival',
+            selectedSong: song,
+            players: [
+              { id: 'me', displayName: 'Me', role: 'spectator', ready: true },
+              { id: 'rival', displayName: 'Rival', role: 'dancer', ready: true },
+            ],
+          }),
+        ),
+    })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    expect(hint()).toBe(
+      'The song is chosen, but the battle can\'t start yet. At least 2 players must choose "Dance" to start.',
+    )
+  })
+
+  it('shows the host the same explanation next to the disabled "Start battle"', async () => {
+    serverAnswers({
+      'room:join': () =>
+        Promise.resolve(
+          lobby({
+            selectedSong: song,
+            players: [
+              { id: 'me', displayName: 'Me', role: 'dancer', ready: true },
+              { id: 'rival', displayName: 'Rival', role: 'dancer', ready: false },
+            ],
+          }),
+        ),
+    })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    expect(screen.getByRole('button', { name: 'Start battle' })).toHaveProperty('disabled', true)
+    expect(hint()).toBe("The song is chosen, but the battle can't start yet. Waiting for Rival to be ready.")
+  })
+})
+
 describe('removing a player', () => {
   it('lets the host remove another player after confirming, one request at a time', async () => {
     const user = userEvent.setup()
@@ -287,6 +457,16 @@ describe('removing a player', () => {
 
     await act(async () => answerKick(lobby({ players: [{ id: 'me', displayName: 'Me', role: 'undecided' }] })))
     expect(screen.queryByText('Rival')).toBeNull()
+  })
+
+  it('keeps the 44 px touch target of "Remove" from making the card taller', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    const remove = screen.getByRole('button', { name: 'Remove Rival' })
+    expect(remove.className).toContain('pointer-coarse:min-h-11')
+    expect(remove.className).toContain('pointer-coarse:-my-3')
   })
 
   it('can be cancelled', async () => {

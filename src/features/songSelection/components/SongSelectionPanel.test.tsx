@@ -113,6 +113,9 @@ describe('Escenario 2: escritura exitosa y elección de la canción', () => {
     emitWithAck.mockResolvedValue(room(selection({ phase: 'done', chooserId: 'me' })))
     renderAs('me', room(selection({ phase: 'choosing', chooserId: 'me', chooserReason: 'typed' })))
     expect(screen.getByText('You won! Choose the song to dance')).toBeTruthy()
+    // Each song button says its title, artist and length to assistive technology.
+    expect(screen.getByRole('button', { name: 'Dance Monkey by Tones and I, 3:29' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Bailando by Enrique Iglesias, 4:03' })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: /Bailando/ }))
     expect(emitWithAck).toHaveBeenCalledWith('song:choose', { roomCode: 'ROOM01', playerId: 'me', songId: 'song-2' })
   })

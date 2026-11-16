@@ -32,7 +32,9 @@ export function LiveScoreboardView({ standings, changes, announcement, myId = nu
   return (
     <section
       aria-labelledby="live-ranking-heading"
-      className="flex flex-col gap-3 rounded-2xl border border-line bg-surface shadow-soft p-4"
+      // A container: the table adapts to the width of the panel (a phone, the
+      // 20rem sidebar), not to the width of the window.
+      className="@container flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-soft"
     >
       <h2 id="live-ranking-heading" className="text-sm font-semibold uppercase tracking-wide text-ink-muted">
         Live ranking
@@ -40,22 +42,24 @@ export function LiveScoreboardView({ standings, changes, announcement, myId = nu
       {standings.length === 0 ? (
         <p className="text-sm text-ink-soft">The ranking appears when the battle starts.</p>
       ) : (
-        <table className="w-full border-separate border-spacing-y-1 text-sm">
+        <table className="w-full table-fixed border-separate border-spacing-y-1 text-sm">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wide text-ink-soft">
-              <th scope="col" className="px-2 font-medium">
+              <th scope="col" className="w-16 px-2 font-medium">
                 Rank
               </th>
+              {/* The only flexible column: it takes what the fixed ones leave and truncates. */}
               <th scope="col" className="px-2 font-medium">
                 Dancer
               </th>
-              <th scope="col" className="px-1 text-right font-medium">
+              <th scope="col" className="w-14 px-1 text-right font-medium">
                 Votes
               </th>
-              <th scope="col" className="px-1 text-right font-medium">
+              {/* The score already counts the words, so this column gives way on a narrow panel. */}
+              <th scope="col" className="hidden w-14 px-1 text-right font-medium @sm:table-cell">
                 Words
               </th>
-              <th scope="col" className="px-2 text-right font-medium">
+              <th scope="col" className="w-18 px-2 text-right font-medium">
                 Score
               </th>
             </tr>
@@ -78,12 +82,18 @@ export function LiveScoreboardView({ standings, changes, announcement, myId = nu
                       {change?.rankMove && <RankArrow move={change.rankMove} />}
                     </span>
                   </td>
-                  <td className="max-w-[8rem] truncate px-2 py-2 font-medium">
-                    {standing.displayName}
-                    {standing.dancerId === myId && <span className="ml-1 text-xs font-semibold text-accent-strong">(you)</span>}
+                  <td className="px-2 py-2 font-medium">
+                    <span className="flex min-w-0 items-center gap-1">
+                      <span className="truncate" title={standing.displayName}>
+                        {standing.displayName}
+                      </span>
+                      {standing.dancerId === myId && (
+                        <span className="shrink-0 text-xs font-semibold text-accent-strong">(you)</span>
+                      )}
+                    </span>
                   </td>
                   <td className="px-1 py-2 text-right tabular-nums">{standing.votes}</td>
-                  <td className="px-1 py-2 text-right tabular-nums">{standing.wordsWon}</td>
+                  <td className="hidden px-1 py-2 text-right tabular-nums @sm:table-cell">{standing.wordsWon}</td>
                   <td className="rounded-r-lg px-2 py-2 text-right font-bold tabular-nums">
                     <span className="inline-flex items-center justify-end gap-1">
                       {change && change.delta !== 0 && <DeltaChip delta={change.delta} />}

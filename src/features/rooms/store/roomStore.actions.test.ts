@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Room } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useVoteStore } from '../../voting/store/voteStore'
-import { initRoomSync, KICKED_NOTICE, SIGN_IN_REQUIRED, useRoomStore } from './roomStore'
+import { initRoomSync, KICKED_NOTICE, ROOM_IN_BATTLE_NOTICE, SIGN_IN_REQUIRED, useRoomStore } from './roomStore'
 
 const { emitWithAck, post, handlers, ioHandlers, DomainError } = vi.hoisted(() => {
   class DomainError extends Error {
@@ -111,6 +111,17 @@ describe('joinRoom', () => {
     emitWithAck.mockRejectedValue(new DomainError('ROOM_FULL', 'The room is full'))
     expect(await useRoomStore.getState().joinRoom('ROOM01')).toBeNull()
     expect(useRoomStore.getState().joinError).toBe('The room is full')
+  })
+
+  it('tells a latecomer that the battle already started instead of the raw rejection', async () => {
+    emitWithAck.mockRejectedValue(new DomainError('ROOM_NOT_WAITING', 'Room ROOM01 is not accepting players'))
+
+    expect(await useRoomStore.getState().joinRoom('ROOM01')).toBeNull()
+
+    expect(useRoomStore.getState().joinError).toBe(
+      "This room's battle is already in progress. Wait for the rematch or join another room.",
+    )
+    expect(useRoomStore.getState().joinError).toBe(ROOM_IN_BATTLE_NOTICE)
   })
 
   it('joins the room again after a reconnection', async () => {

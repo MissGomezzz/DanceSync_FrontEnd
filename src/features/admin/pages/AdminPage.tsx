@@ -45,7 +45,7 @@ export function AdminPage() {
           <span className="rounded-full bg-secondary-soft px-3 py-1 font-semibold text-secondary-strong">
             Admin · {identity?.displayName ?? 'unknown'}
           </span>
-          <Link to="/home" className="font-semibold text-ink-muted hover:text-ink">
+          <Link to="/home" className="rounded-sm font-semibold text-ink-muted hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
             ← Back to the game
           </Link>
         </div>
@@ -61,7 +61,7 @@ export function AdminPage() {
             aria-selected={tab === id}
             aria-controls={`panel-${id}`}
             onClick={() => select(id)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold ${tab === id ? 'border-primary text-primary-strong' : 'border-transparent text-ink-muted hover:text-ink'}`}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${tab === id ? 'border-primary text-primary-strong' : 'border-transparent text-ink-muted hover:text-ink'}`}
           >
             {label}
           </button>
