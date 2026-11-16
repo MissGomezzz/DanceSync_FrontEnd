@@ -132,6 +132,26 @@ describe('BattleStage song lifecycle (HU 15)', () => {
   })
 })
 
+describe('BattleStage song clock', () => {
+  it('shows a dancer how long the song still lasts, and removes the clock once the battle ends', async () => {
+    // "me" is a dancer: there is no "Votes close in" countdown for them anywhere else.
+    await renderWith(battlingRoom({ startsInMs: -1_000, endsInMs: 119_000 }))
+
+    expect(screen.getByRole('timer').textContent).toBe('Song time: 1:59 left')
+
+    const finished = battlingRoom({ endsInMs: null, endReason: 'song-end', result: { standings: [], winnerId: null } })
+    finished.status = 'finished'
+    act(() => useRoomStore.getState().receiveRoom(finished))
+
+    expect(screen.queryByRole('timer')).toBeNull()
+  })
+
+  it('shows no clock on a server that does not send the deadline', async () => {
+    await renderWith(battlingRoom({ startsInMs: -1_000 }))
+    expect(screen.queryByRole('timer')).toBeNull()
+  })
+})
+
 describe('BattleStage song video errors', () => {
   it('shows a calm notice in the song area when the video cannot be embedded', async () => {
     useRoomStore.setState({ error: null })

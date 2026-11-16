@@ -83,6 +83,28 @@ describe('BattleStageView', () => {
     expect(follows(panels, screen.getAllByRole('figure')[0])).toBe(true)
   })
 
+  it('puts the song clock right under the song video, above the panels', () => {
+    render(
+      <BattleStageView
+        roomCode="ROOM01"
+        room={null}
+        error={null}
+        dancerVideos={[]}
+        cameraPrompt={null}
+        wordRace={null}
+        wordWins={{}}
+        onLeave={() => {}}
+        songVideo={<p>Song video</p>}
+        songTime={<p>1:23 left</p>}
+        songPanels={<p>Vote panel</p>}
+      />,
+    )
+
+    const clock = screen.getByText('1:23 left')
+    expect(clock.previousElementSibling?.textContent).toBe('Song video')
+    expect(clock.compareDocumentPosition(screen.getByText('Vote panel')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('renders no panel slot where the page has a sidebar', () => {
     renderStage([video('a')])
 

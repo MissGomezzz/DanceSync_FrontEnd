@@ -27,6 +27,7 @@ import { useWordRaceWins } from '../../wordRace/store/wordRaceStore'
 import { SongPlayer, YOUTUBE_API_UNAVAILABLE } from '../../songSelection/components/SongPlayer'
 import { SongVideoNotice } from '../../songSelection/components/SongVideoNotice'
 import { BattleStageView } from './BattleStageView'
+import { SongTimeRemaining } from './SongTimeRemaining'
 import { StartCountdown } from './StartCountdown'
 
 interface BattleStageProps {
@@ -91,6 +92,7 @@ export function BattleStage({ roomCode, songPanels = null }: BattleStageProps) {
 
   const inRoom = room?.code === roomCode
   const battle = inRoom ? room.battle : null
+  const runningBattle = inRoom && room.status === 'battling' ? battle : null
   // Anchored on the local monotonic clock when each room payload arrives, so the
   // song starts in sync even when this device's wall clock is off.
   const songStartAt = useServerTime(battle?.startsInMs, battle, battle?.startedAt ?? null)
@@ -151,6 +153,8 @@ export function BattleStage({ roomCode, songPanels = null }: BattleStageProps) {
     <>
       <BattleStageView
         songVideo={songVideo}
+        // Dancers have no vote panel countdown, so the song clock is here for everyone.
+        songTime={<SongTimeRemaining battle={runningBattle} />}
         songPanels={songPanels}
         roomCode={roomCode}
         room={inRoom ? room : null}
@@ -164,7 +168,7 @@ export function BattleStage({ roomCode, songPanels = null }: BattleStageProps) {
         results={results}
       />
       {/* Same start instant as the song player, so "Dance!" lands on the first beat. */}
-      <StartCountdown battle={inRoom && room.status === 'battling' ? battle : null} startAt={songStartAt} />
+      <StartCountdown battle={runningBattle} startAt={songStartAt} />
       <EndAnnouncement room={inRoom ? room : null} />
     </>
   )

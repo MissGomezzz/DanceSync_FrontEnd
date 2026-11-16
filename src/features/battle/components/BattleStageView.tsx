@@ -27,6 +27,8 @@ interface BattleStageViewProps {
   wordWins: Record<string, number>
   onLeave: () => void
   songVideo?: ReactNode
+  /** Slim "time left" clock right under the song video, for dancers and spectators alike. */
+  songTime?: ReactNode
   /**
    * Panels shown right after the song video and before the camera tiles (the
    * vote and the live ranking on a phone); null where the page has a sidebar for them.
@@ -53,6 +55,7 @@ export function BattleStageView({
   wordWins,
   onLeave,
   songVideo,
+  songTime = null,
   songPanels = null,
   results = null,
 }: BattleStageViewProps) {
@@ -85,8 +88,8 @@ export function BattleStageView({
         20rem, and a second split there left the song video too small.
       */}
       <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(260px,1fr)]">
-        {/* Music video */}
-        <div className="min-w-0">
+        {/* Music video, with the song clock under it */}
+        <div className="flex min-w-0 flex-col gap-2">
           {songVideo ? (
             <div className="w-full overflow-hidden rounded-2xl bg-black shadow-soft">
               {songVideo}
@@ -96,6 +99,7 @@ export function BattleStageView({
               {songPlaceholder(room)}
             </div>
           )}
+          {songTime}
         </div>
 
         {songPanels && <div className="flex min-w-0 flex-col gap-3">{songPanels}</div>}
