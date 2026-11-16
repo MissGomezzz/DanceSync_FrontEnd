@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useShallow } from 'zustand/react/shallow'
+import type { PeerConnectionStatus } from '../types'
 
 /**
  * UI-facing view of the WebRTC mesh. The RTCPeerConnections themselves live in
@@ -9,9 +10,9 @@ interface PeerState {
   /** Remote camera stream per player id. */
   remoteStreams: Record<string, MediaStream>
   /** Connection state per player id, for placeholders such as "Connecting...". */
-  connectionStates: Record<string, RTCPeerConnectionState>
+  connectionStates: Record<string, PeerConnectionStatus>
   setRemoteStream: (playerId: string, stream: MediaStream | null) => void
-  setConnectionState: (playerId: string, state: RTCPeerConnectionState | null) => void
+  setConnectionState: (playerId: string, state: PeerConnectionStatus | null) => void
   reset: () => void
 }
 

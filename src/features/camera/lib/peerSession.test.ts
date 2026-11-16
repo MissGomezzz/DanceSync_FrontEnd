@@ -2,7 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Player, Room } from '../../../shared/types'
 import { usePeerStore } from '../store/peerStore'
 import type { WebRtcSignal } from '../types'
-import { createPeerSession, ICE_GATHERING_CAP_MS, type PeerSession } from './peerSession'
+import {
+  CONNECT_TIMEOUT_MS,
+  createPeerSession,
+  DISCONNECTED_GRACE_MS,
+  ICE_GATHERING_CAP_MS,
+  OFFER_WAIT_MS,
+  type PeerSession,
+  RETRY_DELAYS_MS,
+} from './peerSession'
 import {
   MAX_RATE_LIMIT_RETRIES,
   MAX_REJECTED_RETRIES,
@@ -99,9 +107,13 @@ class FakePeerConnection {
     this.onicecandidate?.({ candidate: null })
   }
 
-  failConnection() {
-    this.connectionState = 'failed'
+  setState(state: RTCPeerConnectionState) {
+    this.connectionState = state
     this.onconnectionstatechange?.()
+  }
+
+  failConnection() {
+    this.setState('failed')
   }
 }
 
@@ -158,6 +170,9 @@ function sentSignals(): WebRtcSignal[] {
 
 /** Events this client sent, by name and in order. */
 const sentEvents = () => fakeSocket.emit.mock.calls.map(([event]) => event)
+
+/** What the stage is told about the connection with a player. */
+const statusOf = (playerId: string) => usePeerStore.getState().connectionStates[playerId]
 
 const track = { kind: 'video' } as MediaStreamTrack
 
@@ -473,7 +488,7 @@ describe('createPeerSession: signaling delivery', () => {
   it('gives up a description that keeps being rate limited, without flooding', async () => {
     refuseSignals(Number.POSITIVE_INFINITY, RATE_LIMITED)
     start('a', true)
-    await flush(60_000)
+    await flush(CONNECT_TIMEOUT_MS - 1000)
     expect(sentSignals()).toHaveLength(1 + MAX_RATE_LIMIT_RETRIES)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('kept being rate limited'))
   })
@@ -481,7 +496,7 @@ describe('createPeerSession: signaling delivery', () => {
   it('does not resend a signal refused for another reason', async () => {
     refuseSignals(1, NOT_IN_ROOM)
     start('a', true)
-    await flush(60_000)
+    await flush(CONNECT_TIMEOUT_MS - 1000)
     expect(sentSignals()).toHaveLength(1)
   })
 
@@ -524,7 +539,7 @@ describe('createPeerSession: signaling delivery', () => {
     expect(sentEvents()).toEqual(['webrtc:ready', 'webrtc:signal'])
 
     acks[0](RATE_LIMITED)
-    await flush(60_000)
+    await flush(5000)
     expect(sentEvents()).toEqual(['webrtc:ready', 'webrtc:signal'])
   })
 })
@@ -693,30 +708,301 @@ describe('createPeerSession: as the offerer', () => {
     expect(built.tracks).toEqual([track])
   })
 
-  it('retries a failed connection once, then reports the failure', async () => {
-    const { pc } = await offeringTo('fan')
-    pc.failConnection()
-    await flush()
-
-    expect(pc.close).toHaveBeenCalled()
-    expect(pcsFor()).toHaveLength(2)
-    const retry = pcsFor()[1]
-    expect(sentSignals()).toHaveLength(2)
-
-    retry.failConnection()
-    await flush()
-    expect(pcsFor()).toHaveLength(2)
-    expect(usePeerStore.getState().connectionStates.fan).toBe('failed')
-  })
-
   it('mirrors connection state changes of the current connection only', async () => {
     const { pc } = await offeringTo('fan')
-    pc.connectionState = 'connected'
-    pc.onconnectionstatechange?.()
-    expect(usePeerStore.getState().connectionStates.fan).toBe('connected')
+    pc.setState('connected')
+    expect(statusOf('fan')).toBe('connected')
+  })
+})
+
+describe('createPeerSession: recovery as the offerer', () => {
+  beforeEach(() => {
+    room = battleRoom(['a', 'fan'])
   })
 
-  it('reports a failed answered connection without retrying', async () => {
+  it('offers again after a failure with a growing wait, then reports the failure', async () => {
+    start('a', true)
+    await flush()
+
+    for (const [attempt, delay] of RETRY_DELAYS_MS.entries()) {
+      const pc = pcsFor()[attempt]
+      pc.failConnection()
+      expect(pc.close).toHaveBeenCalled()
+      expect(statusOf('fan')).toBe('retrying')
+      await flush(delay - 1)
+      expect(pcsFor()).toHaveLength(attempt + 1)
+      await flush(1)
+      expect(pcsFor()).toHaveLength(attempt + 2)
+      expect(statusOf('fan')).toBe('new')
+    }
+
+    pcsFor().at(-1)?.failConnection()
+    expect(statusOf('fan')).toBe('failed')
+    await flush(120_000)
+    expect(pcsFor()).toHaveLength(1 + RETRY_DELAYS_MS.length)
+    expect(sentSignals()).toHaveLength(1 + RETRY_DELAYS_MS.length)
+    expect(statusOf('fan')).toBe('failed')
+  })
+
+  it('does not offer to a failing peer again on every room update', async () => {
+    start('a', true)
+    await flush()
+    pcsFor()[0].failConnection()
+    for (let i = 0; i < 20; i += 1) fire('room:updated')
+    await flush(RETRY_DELAYS_MS[0] - 1)
+    // Still waiting for the first retry: the updates opened nothing.
+    expect(pcsFor()).toHaveLength(1)
+
+    // Use up every attempt.
+    await flush(1)
+    for (const delay of RETRY_DELAYS_MS.slice(1)) {
+      pcsFor().at(-1)?.failConnection()
+      await flush(delay)
+    }
+    pcsFor().at(-1)?.failConnection()
+    const opened = pcsFor().length
+    for (let i = 0; i < 20; i += 1) fire('room:updated')
+    await flush(120_000)
+    expect(pcsFor()).toHaveLength(opened)
+    expect(sentSignals()).toHaveLength(opened)
+    expect(statusOf('fan')).toBe('failed')
+  })
+
+  it('starts with every attempt again once a connection succeeds', async () => {
+    start('a', true)
+    await flush()
+    pcsFor()[0].failConnection()
+    await flush(RETRY_DELAYS_MS[0])
+    pcsFor()[1].failConnection()
+    await flush(RETRY_DELAYS_MS[1])
+    pcsFor()[2].setState('connected')
+
+    pcsFor()[2].failConnection()
+    await flush(RETRY_DELAYS_MS[0])
+    expect(pcsFor()).toHaveLength(4)
+  })
+
+  it('treats a connection that never connects as failed', async () => {
+    start('a', true)
+    await flush(CONNECT_TIMEOUT_MS - 1)
+    expect(statusOf('fan')).toBe('new')
+    await flush(1)
+    expect(statusOf('fan')).toBe('retrying')
+    await flush(RETRY_DELAYS_MS[0])
+    expect(pcsFor()).toHaveLength(2)
+  })
+
+  it('leaves a connected peer alone', async () => {
+    start('a', true)
+    await flush()
+    pcsFor()[0].setState('connecting')
+    pcsFor()[0].setState('connected')
+    await flush(120_000)
+    expect(pcsFor()).toHaveLength(1)
+    expect(statusOf('fan')).toBe('connected')
+  })
+
+  it('replaces a connection that stays disconnected, but not one that heals', async () => {
+    start('a', true)
+    await flush()
+    const [pc] = pcsFor()
+    pc.setState('connected')
+
+    pc.setState('disconnected')
+    expect(statusOf('fan')).toBe('disconnected')
+    await flush(DISCONNECTED_GRACE_MS - 1)
+    pc.setState('connected')
+    await flush(120_000)
+    expect(pcsFor()).toHaveLength(1)
+
+    pc.setState('disconnected')
+    await flush(DISCONNECTED_GRACE_MS)
+    expect(pc.close).toHaveBeenCalled()
+    expect(statusOf('fan')).toBe('retrying')
+    await flush(RETRY_DELAYS_MS[0])
+    expect(pcsFor()).toHaveLength(2)
+  })
+
+  it('gives a peer that announces itself every attempt again', async () => {
+    start('a', true)
+    await flush()
+    for (const delay of RETRY_DELAYS_MS) {
+      pcsFor().at(-1)?.failConnection()
+      await flush(delay)
+    }
+    pcsFor().at(-1)?.failConnection()
+    expect(statusOf('fan')).toBe('failed')
+
+    fire('webrtc:peer-ready', { playerId: 'fan' })
+    await flush()
+    expect(statusOf('fan')).toBe('new')
+    pcsFor().at(-1)?.failConnection()
+    expect(statusOf('fan')).toBe('retrying')
+  })
+
+  it('forgets a failing peer that left the room', async () => {
+    start('a', true)
+    await flush()
+    pcsFor()[0].failConnection()
+    room = battleRoom(['a'])
+    fire('room:updated')
+    expect(statusOf('fan')).toBeUndefined()
+    await flush(120_000)
+    expect(pcsFor()).toHaveLength(1)
+
+    // Back in the room, it is offered to right away.
+    room = battleRoom(['a', 'fan'])
+    fire('room:updated')
+    await flush()
+    expect(pcsFor()).toHaveLength(2)
+  })
+})
+
+describe('createPeerSession: recovery as the answerer', () => {
+  const offerFromA = (negotiationId: string): WebRtcSignal => ({
+    roomCode: 'ROOM01',
+    from: 'a',
+    to: 'fan',
+    negotiationId,
+    description: { type: 'offer', sdp: 'remote-offer' },
+  })
+
+  const announcements = () => sentEvents().filter((event) => event === 'webrtc:ready').length
+
+  async function answeringA() {
+    start('fan', false)
+    fire('webrtc:signal', offerFromA('neg-1'))
+    await flush()
+    return pcsFor()[0]
+  }
+
+  it('asks for a new offer with webrtc:ready, with a growing wait, and stops after the limit', async () => {
+    const pc = await answeringA()
+    expect(announcements()).toBe(1)
+    pc.failConnection()
+    expect(pc.close).toHaveBeenCalled()
+
+    for (const [attempt, delay] of RETRY_DELAYS_MS.entries()) {
+      expect(statusOf('a')).toBe('retrying')
+      // The first wait is longer: the offerer normally comes back by itself.
+      const wait = attempt === 0 ? delay + OFFER_WAIT_MS : delay
+      await flush(wait - 1)
+      expect(announcements()).toBe(attempt + 1)
+      await flush(1)
+      expect(announcements()).toBe(attempt + 2)
+      // The offer it asked for gets some time to arrive.
+      await flush(OFFER_WAIT_MS - 1)
+      expect(statusOf('a')).toBe('retrying')
+      await flush(1)
+    }
+
+    expect(statusOf('a')).toBe('failed')
+    await flush(120_000)
+    expect(announcements()).toBe(1 + RETRY_DELAYS_MS.length)
+    expect(pcsFor()).toHaveLength(1)
+    expect(statusOf('a')).toBe('failed')
+  })
+
+  it('does not ask when the offerer comes back by itself', async () => {
+    const pc = await answeringA()
+    pc.failConnection()
+    await flush(RETRY_DELAYS_MS[0])
+    fire('webrtc:signal', offerFromA('neg-2'))
+    await flush()
+    expect(statusOf('a')).toBe('new')
+    pcsFor()[1].setState('connected')
+
+    await flush(120_000)
+    expect(announcements()).toBe(1)
+    expect(sentSignals().map((s) => s.negotiationId)).toEqual(['neg-1', 'neg-2'])
+  })
+
+  it('asks when an answered connection never connects or freezes', async () => {
+    const pc = await answeringA()
+    await flush(CONNECT_TIMEOUT_MS)
+    expect(pc.close).toHaveBeenCalled()
+    expect(statusOf('a')).toBe('retrying')
+    await flush(RETRY_DELAYS_MS[0] + OFFER_WAIT_MS)
+    expect(announcements()).toBe(2)
+
+    fire('webrtc:signal', offerFromA('neg-2'))
+    await flush()
+    pcsFor()[1].setState('connected')
+    pcsFor()[1].setState('disconnected')
+    await flush(DISCONNECTED_GRACE_MS + RETRY_DELAYS_MS[0] + OFFER_WAIT_MS)
+    expect(announcements()).toBe(3)
+  })
+
+  it('stops asking for a peer that left the room', async () => {
+    const pc = await answeringA()
+    pc.failConnection()
+    room = battleRoom(['b', 'fan', 'fan2'])
+    await flush(120_000)
+    expect(announcements()).toBe(1)
+    expect(statusOf('a')).toBeUndefined()
+  })
+})
+
+describe('createPeerSession: socket reconnection', () => {
+  const announcements = () => sentEvents().filter((event) => event === 'webrtc:ready').length
+
+  function reconnect() {
+    fakeSocket.connected = false
+    fire('disconnect')
+    fakeSocket.connected = true
+    fire('connect')
+  }
+
+  it('announces itself again and offers again to the peers that were not connected', async () => {
+    room = battleRoom(['a', 'fan', 'fan2'])
+    start('a', true)
+    await flush()
+    const [fanPc, fan2Pc] = pcsFor()
+    fanPc.setState('connected')
+
+    reconnect()
+    await flush()
+
+    expect(announcements()).toBe(2)
+    expect(fanPc.close).not.toHaveBeenCalled()
+    expect(fan2Pc.close).toHaveBeenCalled()
+    expect(pcsFor()).toHaveLength(3)
+    expect(sentSignals().map((s) => s.to)).toEqual(['fan', 'fan2', 'fan2'])
+  })
+
+  it('drops the signaling that was still queued and starts over', async () => {
+    start('a', true)
+    await flush(0)
+    // Only the announcement left; the three offers are still queued.
+    expect(sentEvents()).toEqual(['webrtc:ready'])
+
+    reconnect()
+    await flush()
+    expect(sentEvents()).toEqual(['webrtc:ready', 'webrtc:ready', 'webrtc:signal', 'webrtc:signal', 'webrtc:signal'])
+    const current = pcsFor().slice(3)
+    expect(current).toHaveLength(3)
+    expect(pcsFor().slice(0, 3).every((pc) => pc.close.mock.calls.length === 1)).toBe(true)
+  })
+
+  it('offers again to a peer it had given up', async () => {
+    room = battleRoom(['a', 'fan'])
+    start('a', true)
+    await flush()
+    for (const delay of RETRY_DELAYS_MS) {
+      pcsFor().at(-1)?.failConnection()
+      await flush(delay)
+    }
+    pcsFor().at(-1)?.failConnection()
+    expect(statusOf('fan')).toBe('failed')
+    const opened = pcsFor().length
+
+    reconnect()
+    await flush()
+    expect(pcsFor()).toHaveLength(opened + 1)
+    expect(statusOf('fan')).toBe('new')
+  })
+
+  it('asks for offers once as the answerer and forgets the pending attempts', async () => {
     start('fan', false)
     fire('webrtc:signal', {
       roomCode: 'ROOM01',
@@ -725,11 +1011,33 @@ describe('createPeerSession: as the offerer', () => {
       negotiationId: 'neg-1',
       description: { type: 'offer', sdp: 'remote-offer' },
     })
+    fire('webrtc:signal', {
+      roomCode: 'ROOM01',
+      from: 'b',
+      to: 'fan',
+      negotiationId: 'neg-b',
+      description: { type: 'offer', sdp: 'remote-offer' },
+    })
     await flush()
     pcsFor()[0].failConnection()
+    // Dancer b came back by itself after an earlier failure: its attempts are tracked next to a live connection.
+    pcsFor()[1].failConnection()
+    fire('webrtc:signal', {
+      roomCode: 'ROOM01',
+      from: 'b',
+      to: 'fan',
+      negotiationId: 'neg-b2',
+      description: { type: 'offer', sdp: 'remote-offer' },
+    })
     await flush()
-    expect(pcsFor()).toHaveLength(1)
-    expect(usePeerStore.getState().connectionStates.a).toBe('failed')
+    pcsFor()[2].setState('connecting')
+    expect(usePeerStore.getState().connectionStates).toEqual({ a: 'retrying', b: 'connecting' })
+
+    reconnect()
+    expect(usePeerStore.getState().connectionStates).toEqual({ b: 'connecting' })
+    pcsFor()[2].setState('connected')
+    await flush(120_000)
+    expect(announcements()).toBe(2)
   })
 })
 
@@ -801,6 +1109,19 @@ describe('createPeerSession: dispose', () => {
     })
     await flush()
     expect(pcsFor()).toHaveLength(1)
+  })
+
+  it('cancels the pending retries and watchdogs', async () => {
+    room = battleRoom(['a', 'fan', 'fan2'])
+    const current = start('a', true)
+    await flush()
+    pcsFor()[0].failConnection()
+    current.dispose()
+    session = null
+    await flush(120_000)
+    expect(pcsFor()).toHaveLength(2)
+    expect(sentEvents()).toHaveLength(3)
+    expect(usePeerStore.getState().connectionStates).toEqual({})
   })
 
   it('sends nothing that was still queued when the session was disposed', async () => {

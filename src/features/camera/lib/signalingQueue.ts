@@ -46,8 +46,12 @@ export interface SendOptions {
 export interface SignalingQueue {
   /** Queues an event; events are delivered one at a time, in order. */
   send: (event: string, payload: unknown, options?: SendOptions) => void
+  /** Whether `event` is still waiting to be sent or acknowledged. */
+  has: (event: string) => boolean
   /** Sends what was held while the socket was down. */
   resume: () => void
+  /** Forgets everything that was not delivered yet. */
+  clear: () => void
   dispose: () => void
 }
 
@@ -132,19 +136,27 @@ export function createSignalingQueue(socket: Socket): SignalingQueue {
   }
   socket.on('rate:limited', onRateLimited)
 
+  const clear = () => {
+    clearTimeout(ackTimer)
+    clearTimeout(waitTimer)
+    waitTimer = undefined
+    rateLimited = null
+    inFlight = null
+    pending.length = 0
+  }
+
   return {
     send: (event, payload, options) => {
       pending.push({ event, payload, retryRejected: options?.retryRejected ?? false, rateLimitRetries: 0, rejections: 0 })
       pump()
     },
+    has: (event) => pending.some((queued) => queued.event === event),
     resume: pump,
+    clear,
     dispose: () => {
       disposed = true
       socket.off('rate:limited', onRateLimited)
-      clearTimeout(ackTimer)
-      clearTimeout(waitTimer)
-      pending.length = 0
-      inFlight = null
+      clear()
     },
   }
 }

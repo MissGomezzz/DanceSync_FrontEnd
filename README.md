@@ -97,6 +97,10 @@ spectators) watches it live. The stage shows one tile per dancer in a two-column
   gathering to finish (2 s at most) and sends one description with the candidates inside. Events leave one
   at a time through a paced queue, and one the server dropped (`RATE_LIMITED`) is sent again after the
   `retryAfterMs` of the `rate:limited` notice.
+- **Recovery**: a connection that fails, does not connect within 15 s, or stays disconnected for 5 s is
+  replaced, up to three times per peer (after 1 s, 3 s and 6 s); the tile shows "Reconnecting..." meanwhile
+  and "Could not connect" only when every attempt was used. The offerer offers again; the answerer asks for a
+  new offer by sending `webrtc:ready` again. After the socket reconnects the session announces itself again.
 - **ICE servers**: `stun:stun.l.google.com:19302` is always used. Peers behind strict or symmetric NATs
   (some corporate or mobile networks) cannot connect with STUN alone and need a TURN relay: set
   `VITE_TURN_URLS`, `VITE_TURN_USERNAME` and `VITE_TURN_CREDENTIAL` to add one. Malformed URLs and a relay

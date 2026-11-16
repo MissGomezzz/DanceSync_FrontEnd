@@ -27,4 +27,11 @@ export interface WebRtcPeerReady {
   playerId: string
 }
 
+/**
+ * What the stage shows about the connection with a peer: the browser's state,
+ * or `retrying` between two attempts (`failed` then means that every attempt
+ * was used up).
+ */
+export type PeerConnectionStatus = RTCPeerConnectionState | 'retrying'
+
 export type CameraStatus = 'idle' | 'prompt' | 'requesting' | 'granted' | 'denied' | 'unavailable' | 'error'

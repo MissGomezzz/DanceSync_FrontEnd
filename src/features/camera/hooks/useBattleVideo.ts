@@ -5,6 +5,7 @@ import { useRoom, useRoomStore } from '../../rooms/store/roomStore'
 import { createPeerSession } from '../lib/peerSession'
 import { useCameraStatus, useCameraStore, useLocalStream } from '../store/cameraStore'
 import { usePeerConnectionStates, useRemoteStreams } from '../store/peerStore'
+import type { PeerConnectionStatus } from '../types'
 
 export interface DancerVideo {
   dancer: Player
@@ -20,9 +21,11 @@ export interface BattleVideo {
   needsCameraPrompt: boolean
 }
 
-function remotePlaceholder(name: string, state: RTCPeerConnectionState | null, waitingForMyCamera: boolean): string {
+function remotePlaceholder(name: string, state: PeerConnectionStatus | null, waitingForMyCamera: boolean): string {
   if (waitingForMyCamera) return `${name}'s camera will appear once yours is on.`
+  // `failed` is only reported once every attempt was used up.
   if (state === 'failed') return `Could not connect to ${name}'s camera.`
+  if (state === 'retrying' || state === 'disconnected') return `Reconnecting to ${name}'s camera...`
   if (state === 'new' || state === 'connecting') return `Connecting to ${name}'s camera...`
   return `Waiting for ${name}'s camera...`
 }

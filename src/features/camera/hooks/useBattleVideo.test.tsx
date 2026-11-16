@@ -85,6 +85,22 @@ describe('useBattleVideo', () => {
     expect(c.stream).toBe(streamC)
   })
 
+  it('tells a connection being retried from one that was given up', () => {
+    useAuthStore.setState({ identity: { id: 'fan', displayName: 'FAN' } })
+    const { result } = renderHook(() => useBattleVideo('ROOM01'))
+
+    act(() => {
+      usePeerStore.getState().setConnectionState('a', 'retrying')
+      usePeerStore.getState().setConnectionState('b', 'disconnected')
+      usePeerStore.getState().setConnectionState('c', 'failed')
+    })
+
+    const [a, b, c] = result.current.dancerVideos
+    expect(a.placeholder).toBe("Reconnecting to A's camera...")
+    expect(b.placeholder).toBe("Reconnecting to B's camera...")
+    expect(c.placeholder).toBe("Could not connect to C's camera.")
+  })
+
   it('shows the local preview in the local dancer tile among the others', () => {
     const mine = fakeStream('mine')
     useAuthStore.setState({ identity: { id: 'b', displayName: 'B' } })

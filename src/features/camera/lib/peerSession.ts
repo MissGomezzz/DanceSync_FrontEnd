@@ -2,7 +2,7 @@ import { env } from '../../../shared/lib/env'
 import { connectSocket } from '../../../shared/lib/socket'
 import type { Room } from '../../../shared/types'
 import { usePeerStore } from '../store/peerStore'
-import type { WebRtcPeerReady, WebRtcReady, WebRtcSignal } from '../types'
+import type { PeerConnectionStatus, WebRtcPeerReady, WebRtcReady, WebRtcSignal } from '../types'
 import { buildIceServers, DEFAULT_ICE_SERVERS } from './iceServers'
 import { createSignalingQueue } from './signalingQueue'
 
@@ -12,6 +12,14 @@ import { createSignalingQueue } from './signalingQueue'
  * otherwise hold the description back for many seconds.
  */
 export const ICE_GATHERING_CAP_MS = 2000
+/** Waits before each new attempt with a peer whose connection failed; `failed` is final after the last one. */
+export const RETRY_DELAYS_MS = [1000, 3000, 6000]
+/** A connection that has not connected by then (lost signaling, no route) counts as failed. */
+export const CONNECT_TIMEOUT_MS = 15_000
+/** A connection that stays `disconnected` this long (frozen video) counts as failed. */
+export const DISCONNECTED_GRACE_MS = 5000
+/** Time a new offer needs to reach the answerer: the offerer's ICE gathering and the delivery. */
+export const OFFER_WAIT_MS = 4000
 
 export interface PeerSessionOptions {
   roomCode: string
@@ -36,8 +44,14 @@ interface PeerEntry {
   pendingCandidates: RTCIceCandidateInit[]
   /** The local description left with its candidates inside; later ones travel on their own. */
   descriptionSent: boolean
-  /** True when this connection is already the single retry after a failure. */
-  isRetry: boolean
+  /** Fires when the connection does not connect in time or stays disconnected. */
+  watchdog: ReturnType<typeof setTimeout> | undefined
+}
+
+/** Attempts used to get a connection with a peer back; forgotten once it connects. */
+interface Recovery {
+  attempts: number
+  timer: ReturnType<typeof setTimeout> | undefined
 }
 
 /** Resolves once the ICE candidates are gathered, or after `ICE_GATHERING_CAP_MS`. */
@@ -79,6 +93,14 @@ function closeConnection(pc: RTCPeerConnection) {
  * the gathering to finish and sends one description with the candidates inside,
  * through a queue that paces the events and sends the dropped ones again.
  * Candidates trickled by a peer are still accepted.
+ *
+ * Recovery: a connection that fails, does not connect in time or stays
+ * disconnected is replaced, at most `RETRY_DELAYS_MS.length` times per peer and
+ * with a growing wait. The offerer offers again. The answerer cannot offer, so
+ * it announces itself again (`webrtc:ready`), which makes its offerers offer;
+ * because that also renews its healthy connections, it first gives the offerer,
+ * which normally saw the same failure, time to come back on its own. After the
+ * socket reconnects the session announces itself and starts over.
  */
 export function createPeerSession(options: PeerSessionOptions): PeerSession {
   const { roomCode, myId, isDancer, getRoom, localStream } = options
@@ -86,7 +108,10 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
   const signaling = createSignalingQueue(socket)
   const iceServers = buildIceServers(env)
   const peers = new Map<string, PeerEntry>()
+  const recoveries = new Map<string, Recovery>()
   let disposed = false
+  /** The socket dropped: signaling sent or expected meanwhile is lost. */
+  let wasOffline = false
 
   const currentRoom = (): Room | null => {
     const room = getRoom()
@@ -116,14 +141,72 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
     signaling.send('webrtc:signal', signal)
   }
 
+  const setStatus = (otherId: string, status: PeerConnectionStatus | null) =>
+    usePeerStore.getState().setConnectionState(otherId, status)
+
+  // The server refuses the announcement until the socket (re)joined the room, so that refusal is retried.
+  const ready: WebRtcReady = { roomCode, playerId: myId }
+  const announce = () => {
+    if (!signaling.has('webrtc:ready')) signaling.send('webrtc:ready', ready, { retryRejected: true })
+  }
+
   const closePeer = (otherId: string) => {
     const entry = peers.get(otherId)
     if (entry) {
       peers.delete(otherId)
+      clearTimeout(entry.watchdog)
       closeConnection(entry.pc)
     }
     usePeerStore.getState().setRemoteStream(otherId, null)
-    usePeerStore.getState().setConnectionState(otherId, null)
+    setStatus(otherId, null)
+  }
+
+  /** A later failure with this peer starts again with every attempt. */
+  const forgetRecovery = (otherId: string) => {
+    clearTimeout(recoveries.get(otherId)?.timer)
+    recoveries.delete(otherId)
+  }
+
+  /** One more attempt with a peer whose connection was given up for now. */
+  const retry = (otherId: string, recovery: Recovery) => {
+    recovery.timer = undefined
+    if (!shouldConnect(otherId)) {
+      forgetRecovery(otherId)
+      setStatus(otherId, null)
+    } else if (isOffererFor(otherId)) {
+      void offer(otherId)
+    } else {
+      // Only the peer can offer: ask for it. No offer in time is one more failure.
+      announce()
+      recovery.timer = setTimeout(() => recover(otherId), OFFER_WAIT_MS)
+    }
+  }
+
+  /**
+   * Gives up the current connection with `otherId` and schedules the next
+   * attempt, `headStartMs` later than usual; reports `failed` once they ran out.
+   */
+  function recover(otherId: string, headStartMs = 0) {
+    closePeer(otherId)
+    const recovery = recoveries.get(otherId) ?? { attempts: 0, timer: undefined }
+    recoveries.set(otherId, recovery)
+    clearTimeout(recovery.timer)
+    recovery.timer = undefined
+    if (recovery.attempts >= RETRY_DELAYS_MS.length) {
+      setStatus(otherId, 'failed')
+      return
+    }
+    const delay = RETRY_DELAYS_MS[recovery.attempts] + headStartMs
+    recovery.attempts += 1
+    setStatus(otherId, 'retrying')
+    recovery.timer = setTimeout(() => retry(otherId, recovery), delay)
+  }
+
+  /** Treats the connection as failed unless it is connected again within `ms`. */
+  const watch = (otherId: string, entry: PeerEntry, ms: number) => {
+    clearTimeout(entry.watchdog)
+    // The offerer of a pair normally sees the same failure and offers again by itself.
+    entry.watchdog = setTimeout(() => recover(otherId, entry.isOfferer ? 0 : OFFER_WAIT_MS), ms)
   }
 
   const attachLocalTracks = (pc: RTCPeerConnection) => {
@@ -141,8 +224,10 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
     }
   }
 
-  const createPeer = (otherId: string, negotiationId: string, isOfferer: boolean, isRetry: boolean): PeerEntry => {
+  const createPeer = (otherId: string, negotiationId: string, isOfferer: boolean): PeerEntry => {
     closePeer(otherId)
+    // A new connection supersedes the pending attempt, not the attempts already used.
+    clearTimeout(recoveries.get(otherId)?.timer)
     const pc = openConnection()
     const entry: PeerEntry = {
       pc,
@@ -151,10 +236,11 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
       remoteDescriptionSet: false,
       pendingCandidates: [],
       descriptionSent: false,
-      isRetry,
+      watchdog: undefined,
     }
     peers.set(otherId, entry)
-    usePeerStore.getState().setConnectionState(otherId, pc.connectionState)
+    setStatus(otherId, pc.connectionState)
+    watch(otherId, entry, CONNECT_TIMEOUT_MS)
 
     pc.onicecandidate = (event) => {
       // Candidates gathered before the description is sent are already inside it.
@@ -169,11 +255,16 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
     }
     pc.onconnectionstatechange = () => {
       if (!isCurrent(otherId, entry)) return
-      usePeerStore.getState().setConnectionState(otherId, pc.connectionState)
-      if (pc.connectionState === 'failed') {
-        closePeer(otherId)
-        if (entry.isOfferer && !entry.isRetry && isOffererFor(otherId)) void offer(otherId, true)
-        else usePeerStore.getState().setConnectionState(otherId, 'failed')
+      const state = pc.connectionState
+      setStatus(otherId, state)
+      if (state === 'connected') {
+        clearTimeout(entry.watchdog)
+        forgetRecovery(otherId)
+      } else if (state === 'failed') {
+        recover(otherId, entry.isOfferer ? 0 : OFFER_WAIT_MS)
+      } else if (state === 'disconnected') {
+        // Usually a short network drop that heals by itself; a frozen video does not.
+        watch(otherId, entry, DISCONNECTED_GRACE_MS)
       }
     }
     return entry
@@ -199,8 +290,8 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
     sendSignal(otherId, entry.negotiationId, { description: { type, sdp } })
   }
 
-  async function offer(otherId: string, isRetry = false): Promise<void> {
-    const entry = createPeer(otherId, crypto.randomUUID(), true, isRetry)
+  async function offer(otherId: string): Promise<void> {
+    const entry = createPeer(otherId, crypto.randomUUID(), true)
     attachLocalTracks(entry.pc)
     try {
       await entry.pc.setLocalDescription(await entry.pc.createOffer())
@@ -212,7 +303,7 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
 
   const answer = async (signal: WebRtcSignal, description: RTCSessionDescriptionInit) => {
     const otherId = signal.from
-    const entry = createPeer(otherId, signal.negotiationId, false, false)
+    const entry = createPeer(otherId, signal.negotiationId, false)
     try {
       if (!(await applyRemoteDescription(otherId, entry, description))) return
       // Tracks are attached after the remote offer so addTrack reuses the offered
@@ -258,8 +349,10 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
   /** Aligns connections with the room: drop departed players, offer to new ones. */
   const syncWithRoom = () => {
     if (disposed) return
-    for (const otherId of [...peers.keys()]) {
-      if (!shouldConnect(otherId)) closePeer(otherId)
+    for (const otherId of new Set([...peers.keys(), ...recoveries.keys()])) {
+      if (shouldConnect(otherId)) continue
+      forgetRecovery(otherId)
+      closePeer(otherId)
     }
     // Remote streams can outlive a connection only for players that left.
     const room = currentRoom()
@@ -268,7 +361,9 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
       if (!present.has(playerId)) usePeerStore.getState().setRemoteStream(playerId, null)
     }
     for (const player of room?.players ?? []) {
-      if (!peers.has(player.id) && isOffererFor(player.id)) void offer(player.id)
+      // A peer being retried or given up is not offered to on every room update
+      // (battles send many): its attempts are spaced and bounded.
+      if (!peers.has(player.id) && !recoveries.has(player.id) && isOffererFor(player.id)) void offer(player.id)
     }
   }
 
@@ -276,23 +371,45 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
 
   const onPeerReady = ({ playerId }: WebRtcPeerReady) => {
     if (disposed || playerId === myId) return
-    // The peer (re)started its session: any previous connection is dead on its side.
-    if (isOffererFor(playerId)) void offer(playerId)
+    // The peer (re)started its session, or asks for a new offer: any previous
+    // connection is dead on its side, and it gets every attempt again.
+    if (!isOffererFor(playerId)) return
+    forgetRecovery(playerId)
+    void offer(playerId)
   }
 
   const onRoomUpdated = () => syncWithRoom()
 
-  /** Signaling is held while the socket is down. */
-  const onConnect = () => signaling.resume()
+  const onDisconnect = () => {
+    wasOffline = true
+  }
+
+  /** Signaling is held while the socket is down; after a reconnection the session starts over. */
+  const onConnect = () => {
+    if (wasOffline) {
+      wasOffline = false
+      signaling.clear()
+      for (const otherId of [...recoveries.keys()]) {
+        forgetRecovery(otherId)
+        if (!peers.has(otherId)) setStatus(otherId, null)
+      }
+      // Our offerers offer again; our own offers that were still in the air are sent again.
+      announce()
+      for (const [otherId, entry] of [...peers]) {
+        if (entry.isOfferer && entry.pc.connectionState !== 'connected') void offer(otherId)
+      }
+      syncWithRoom()
+    }
+    signaling.resume()
+  }
 
   socket.on('webrtc:signal', onSignal)
   socket.on('webrtc:peer-ready', onPeerReady)
   socket.on('room:updated', onRoomUpdated)
   socket.on('connect', onConnect)
+  socket.on('disconnect', onDisconnect)
 
-  // The server refuses the announcement until the socket (re)joined the room, so that refusal is retried.
-  const ready: WebRtcReady = { roomCode, playerId: myId }
-  signaling.send('webrtc:ready', ready, { retryRejected: true })
+  announce()
   syncWithRoom()
 
   return {
@@ -303,9 +420,15 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
       socket.off('webrtc:peer-ready', onPeerReady)
       socket.off('room:updated', onRoomUpdated)
       socket.off('connect', onConnect)
+      socket.off('disconnect', onDisconnect)
       signaling.dispose()
-      for (const entry of peers.values()) closeConnection(entry.pc)
+      for (const entry of peers.values()) {
+        clearTimeout(entry.watchdog)
+        closeConnection(entry.pc)
+      }
       peers.clear()
+      for (const recovery of recoveries.values()) clearTimeout(recovery.timer)
+      recoveries.clear()
       usePeerStore.getState().reset()
     },
   }
