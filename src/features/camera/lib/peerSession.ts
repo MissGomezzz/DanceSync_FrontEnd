@@ -4,6 +4,14 @@ import type { Room } from '../../../shared/types'
 import { usePeerStore } from '../store/peerStore'
 import type { WebRtcPeerReady, WebRtcReady, WebRtcSignal } from '../types'
 import { buildIceServers, DEFAULT_ICE_SERVERS } from './iceServers'
+import { createSignalingQueue } from './signalingQueue'
+
+/**
+ * Longest wait for the ICE candidates before a description is sent. Gathering
+ * normally completes well within it; an unreachable STUN or TURN server would
+ * otherwise hold the description back for many seconds.
+ */
+export const ICE_GATHERING_CAP_MS = 2000
 
 export interface PeerSessionOptions {
   roomCode: string
@@ -26,12 +34,38 @@ interface PeerEntry {
   remoteDescriptionSet: boolean
   /** ICE candidates received before the remote description was applied. */
   pendingCandidates: RTCIceCandidateInit[]
+  /** The local description left with its candidates inside; later ones travel on their own. */
+  descriptionSent: boolean
   /** True when this connection is already the single retry after a failure. */
   isRetry: boolean
 }
 
-/** Swallows server rejections (for example a target whose socket is reconnecting). */
-const ignoreAck = () => {}
+/** Resolves once the ICE candidates are gathered, or after `ICE_GATHERING_CAP_MS`. */
+function waitForIceGathering(pc: RTCPeerConnection): Promise<void> {
+  return new Promise((resolve) => {
+    if (pc.iceGatheringState === 'complete') {
+      resolve()
+      return
+    }
+    const finish = () => {
+      clearTimeout(cap)
+      pc.onicegatheringstatechange = null
+      resolve()
+    }
+    const cap = setTimeout(finish, ICE_GATHERING_CAP_MS)
+    pc.onicegatheringstatechange = () => {
+      if (pc.iceGatheringState === 'complete') finish()
+    }
+  })
+}
+
+function closeConnection(pc: RTCPeerConnection) {
+  pc.onicecandidate = null
+  pc.onicegatheringstatechange = null
+  pc.ontrack = null
+  pc.onconnectionstatechange = null
+  pc.close()
+}
 
 /**
  * Owns the WebRTC mesh for one battle: dancers publish their camera, everyone
@@ -39,10 +73,17 @@ const ignoreAck = () => {}
  * dancer -> spectator: the dancer offers; dancer <-> dancer: the smaller player
  * id offers and the answerer attaches its own track, so one connection carries
  * video both ways; spectator <-> spectator: no connection.
+ *
+ * Signaling is kept small, because battle-service rate limits every socket and
+ * drops what goes over: ICE candidates are not trickled. Each side waits for
+ * the gathering to finish and sends one description with the candidates inside,
+ * through a queue that paces the events and sends the dropped ones again.
+ * Candidates trickled by a peer are still accepted.
  */
 export function createPeerSession(options: PeerSessionOptions): PeerSession {
   const { roomCode, myId, isDancer, getRoom, localStream } = options
   const socket = connectSocket()
+  const signaling = createSignalingQueue(socket)
   const iceServers = buildIceServers(env)
   const peers = new Map<string, PeerEntry>()
   let disposed = false
@@ -72,17 +113,14 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
 
   const sendSignal = (to: string, negotiationId: string, body: Pick<WebRtcSignal, 'description' | 'candidate'>) => {
     const signal: WebRtcSignal = { roomCode, from: myId, to, negotiationId, ...body }
-    socket.emit('webrtc:signal', signal, ignoreAck)
+    signaling.send('webrtc:signal', signal)
   }
 
   const closePeer = (otherId: string) => {
     const entry = peers.get(otherId)
     if (entry) {
       peers.delete(otherId)
-      entry.pc.onicecandidate = null
-      entry.pc.ontrack = null
-      entry.pc.onconnectionstatechange = null
-      entry.pc.close()
+      closeConnection(entry.pc)
     }
     usePeerStore.getState().setRemoteStream(otherId, null)
     usePeerStore.getState().setConnectionState(otherId, null)
@@ -112,13 +150,15 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
       isOfferer,
       remoteDescriptionSet: false,
       pendingCandidates: [],
+      descriptionSent: false,
       isRetry,
     }
     peers.set(otherId, entry)
     usePeerStore.getState().setConnectionState(otherId, pc.connectionState)
 
     pc.onicecandidate = (event) => {
-      if (event.candidate && isCurrent(otherId, entry)) {
+      // Candidates gathered before the description is sent are already inside it.
+      if (event.candidate && entry.descriptionSent && isCurrent(otherId, entry)) {
         sendSignal(otherId, negotiationId, { candidate: event.candidate.toJSON() })
       }
     }
@@ -150,14 +190,21 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
     return isCurrent(otherId, entry)
   }
 
+  /** Sends the local description once, with the ICE candidates gathered so far inside its SDP. */
+  const sendLocalDescription = async (otherId: string, entry: PeerEntry) => {
+    await waitForIceGathering(entry.pc)
+    if (!isCurrent(otherId, entry) || !entry.pc.localDescription) return
+    const { type, sdp } = entry.pc.localDescription
+    entry.descriptionSent = true
+    sendSignal(otherId, entry.negotiationId, { description: { type, sdp } })
+  }
+
   async function offer(otherId: string, isRetry = false): Promise<void> {
     const entry = createPeer(otherId, crypto.randomUUID(), true, isRetry)
     attachLocalTracks(entry.pc)
     try {
       await entry.pc.setLocalDescription(await entry.pc.createOffer())
-      if (!isCurrent(otherId, entry) || !entry.pc.localDescription) return
-      const { type, sdp } = entry.pc.localDescription
-      sendSignal(otherId, entry.negotiationId, { description: { type, sdp } })
+      await sendLocalDescription(otherId, entry)
     } catch (error) {
       if (isCurrent(otherId, entry)) console.warn('WebRTC offer failed', error)
     }
@@ -173,9 +220,7 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
       // second transceiver that an answer cannot negotiate.
       attachLocalTracks(entry.pc)
       await entry.pc.setLocalDescription(await entry.pc.createAnswer())
-      if (!isCurrent(otherId, entry) || !entry.pc.localDescription) return
-      const { type, sdp } = entry.pc.localDescription
-      sendSignal(otherId, entry.negotiationId, { description: { type, sdp } })
+      await sendLocalDescription(otherId, entry)
     } catch (error) {
       if (isCurrent(otherId, entry)) console.warn('WebRTC answer failed', error)
     }
@@ -237,12 +282,17 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
 
   const onRoomUpdated = () => syncWithRoom()
 
+  /** Signaling is held while the socket is down. */
+  const onConnect = () => signaling.resume()
+
   socket.on('webrtc:signal', onSignal)
   socket.on('webrtc:peer-ready', onPeerReady)
   socket.on('room:updated', onRoomUpdated)
+  socket.on('connect', onConnect)
 
+  // The server refuses the announcement until the socket (re)joined the room, so that refusal is retried.
   const ready: WebRtcReady = { roomCode, playerId: myId }
-  socket.emit('webrtc:ready', ready, ignoreAck)
+  signaling.send('webrtc:ready', ready, { retryRejected: true })
   syncWithRoom()
 
   return {
@@ -252,12 +302,9 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
       socket.off('webrtc:signal', onSignal)
       socket.off('webrtc:peer-ready', onPeerReady)
       socket.off('room:updated', onRoomUpdated)
-      for (const entry of peers.values()) {
-        entry.pc.onicecandidate = null
-        entry.pc.ontrack = null
-        entry.pc.onconnectionstatechange = null
-        entry.pc.close()
-      }
+      socket.off('connect', onConnect)
+      signaling.dispose()
+      for (const entry of peers.values()) closeConnection(entry.pc)
       peers.clear()
       usePeerStore.getState().reset()
     },

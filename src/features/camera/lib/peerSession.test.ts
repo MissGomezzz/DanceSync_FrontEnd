@@ -2,25 +2,43 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Player, Room } from '../../../shared/types'
 import { usePeerStore } from '../store/peerStore'
 import type { WebRtcSignal } from '../types'
-import { createPeerSession, type PeerSession } from './peerSession'
+import { createPeerSession, ICE_GATHERING_CAP_MS, type PeerSession } from './peerSession'
+import {
+  MAX_RATE_LIMIT_RETRIES,
+  MAX_REJECTED_RETRIES,
+  RATE_LIMIT_MIN_DELAY_MS,
+  REJECTED_RETRY_DELAY_MS,
+  SIGNAL_ACK_TIMEOUT_MS,
+  SIGNAL_GAP_MS,
+} from './signalingQueue'
 
 type Handler = (payload: unknown) => void
+type Ack = (response: unknown) => void
+
+const ACCEPTED = { ok: true, data: null }
+const RATE_LIMITED = { ok: false, error: { code: 'RATE_LIMITED', message: 'Too many events' } }
+const NOT_IN_ROOM = { ok: false, error: { code: 'PLAYER_NOT_IN_ROOM', message: 'Not in this room' } }
 
 const { fakeSocket } = vi.hoisted(() => {
   const handlers = new Map<string, Set<(payload: unknown) => void>>()
-  return {
-    fakeSocket: {
-      handlers,
-      on: vi.fn((event: string, handler: (payload: unknown) => void) => {
-        if (!handlers.has(event)) handlers.set(event, new Set())
-        handlers.get(event)?.add(handler)
-      }),
-      off: vi.fn((event: string, handler: (payload: unknown) => void) => {
-        handlers.get(event)?.delete(handler)
-      }),
-      emit: vi.fn(),
-    },
+  const socket = {
+    handlers,
+    connected: true,
+    /** The server's acknowledgement of an event; undefined leaves it unanswered. */
+    respond: (_event: string, _payload: unknown): unknown => ({ ok: true, data: null }),
+    on: vi.fn((event: string, handler: (payload: unknown) => void) => {
+      if (!handlers.has(event)) handlers.set(event, new Set())
+      handlers.get(event)?.add(handler)
+    }),
+    off: vi.fn((event: string, handler: (payload: unknown) => void) => {
+      handlers.get(event)?.delete(handler)
+    }),
+    emit: vi.fn((event: string, payload: unknown, ack?: (response: unknown) => void) => {
+      const response = socket.respond(event, payload)
+      if (response !== undefined) ack?.(response)
+    }),
   }
+  return { fakeSocket: socket }
 })
 
 vi.mock('../../../shared/lib/socket', () => ({ connectSocket: () => fakeSocket }))
@@ -32,12 +50,16 @@ vi.mock('../../../shared/lib/env', () => ({ env: fakeEnv }))
 /** Minimal stand-in for RTCPeerConnection: records calls and lets tests drive its events. */
 class FakePeerConnection {
   static instances: FakePeerConnection[] = []
+  /** When true, ICE gathering stays open until the test completes it. */
+  static slowGathering = false
 
   connectionState: RTCPeerConnectionState = 'new'
   signalingState: RTCSignalingState = 'stable'
+  iceGatheringState: RTCIceGatheringState = 'new'
   localDescription: RTCSessionDescriptionInit | null = null
   remoteDescription: RTCSessionDescriptionInit | null = null
   onicecandidate: ((event: { candidate: { toJSON: () => RTCIceCandidateInit } | null }) => void) | null = null
+  onicegatheringstatechange: (() => void) | null = null
   ontrack: ((event: { streams: MediaStream[]; track: MediaStreamTrack }) => void) | null = null
   onconnectionstatechange: (() => void) | null = null
   readonly config: RTCConfiguration
@@ -51,6 +73,7 @@ class FakePeerConnection {
     this.localDescription = description
     if (description.type === 'offer') this.signalingState = 'have-local-offer'
     else this.signalingState = 'stable'
+    this.iceGatheringState = FakePeerConnection.slowGathering ? 'gathering' : 'complete'
   })
   setRemoteDescription = vi.fn(async (description: RTCSessionDescriptionInit) => {
     this.remoteDescription = description
@@ -60,6 +83,20 @@ class FakePeerConnection {
   constructor(config: RTCConfiguration) {
     this.config = config
     FakePeerConnection.instances.push(this)
+  }
+
+  /** A gathered candidate: the browser adds it to the local description and reports it. */
+  gatherCandidate(candidate: string) {
+    if (this.localDescription) {
+      this.localDescription = { ...this.localDescription, sdp: `${this.localDescription.sdp}+${candidate}` }
+    }
+    this.onicecandidate?.({ candidate: { toJSON: () => ({ candidate }) } })
+  }
+
+  completeGathering() {
+    this.iceGatheringState = 'complete'
+    this.onicegatheringstatechange?.()
+    this.onicecandidate?.({ candidate: null })
   }
 
   failConnection() {
@@ -107,7 +144,8 @@ function battleRoom(playerIds = ['a', 'b', 'fan', 'fan2']): Room {
   }
 }
 
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+/** Lets pending promises settle and the signaling queue drain (timers are faked). */
+const flush = (ms = 500) => vi.advanceTimersByTimeAsync(ms)
 
 function fire(event: string, payload?: unknown) {
   for (const handler of fakeSocket.handlers.get(event) ?? []) (handler as Handler)(payload)
@@ -115,8 +153,11 @@ function fire(event: string, payload?: unknown) {
 
 /** Signals this client sent through webrtc:signal. */
 function sentSignals(): WebRtcSignal[] {
-  return fakeSocket.emit.mock.calls.filter(([event]) => event === 'webrtc:signal').map(([, signal]) => signal)
+  return fakeSocket.emit.mock.calls.filter(([event]) => event === 'webrtc:signal').map(([, signal]) => signal as WebRtcSignal)
 }
+
+/** Events this client sent, by name and in order. */
+const sentEvents = () => fakeSocket.emit.mock.calls.map(([event]) => event)
 
 const track = { kind: 'video' } as MediaStreamTrack
 
@@ -134,8 +175,12 @@ function pcsFor() {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers()
   FakePeerConnection.instances = []
+  FakePeerConnection.slowGathering = false
   fakeSocket.handlers.clear()
+  fakeSocket.connected = true
+  fakeSocket.respond = () => ACCEPTED
   fakeSocket.on.mockClear()
   fakeSocket.off.mockClear()
   fakeSocket.emit.mockClear()
@@ -151,6 +196,7 @@ beforeEach(() => {
 afterEach(() => {
   session?.dispose()
   vi.unstubAllGlobals()
+  vi.useRealTimers()
   warn.mockRestore()
 })
 
@@ -257,6 +303,229 @@ describe('createPeerSession: ICE servers', () => {
     expect(pcsFor()[0].config.iceServers).toEqual([stun])
     expect(sentSignals()).toHaveLength(1)
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('ICE servers were rejected'), expect.any(SyntaxError))
+  })
+})
+
+describe('createPeerSession: signaling volume', () => {
+  it('sends one description per peer, candidates inside, and no event per candidate', async () => {
+    FakePeerConnection.slowGathering = true
+    start('a', true)
+    await flush()
+    // Nothing leaves while the candidates are being gathered.
+    expect(sentSignals()).toEqual([])
+
+    for (const pc of pcsFor()) {
+      for (let i = 0; i < 10; i += 1) pc.gatherCandidate(`cand-${i}`)
+      pc.completeGathering()
+    }
+    await flush()
+
+    const signals = sentSignals()
+    expect(signals.map((s) => s.to).sort()).toEqual(['b', 'fan', 'fan2'])
+    for (const signal of signals) {
+      expect(signal.candidate).toBeUndefined()
+      expect(signal.description?.sdp).toContain('offer-sdp+cand-0')
+      expect(signal.description?.sdp).toContain('+cand-9')
+    }
+    // The announcement and one offer per peer: 4 events instead of 34.
+    expect(sentEvents()).toEqual(['webrtc:ready', 'webrtc:signal', 'webrtc:signal', 'webrtc:signal'])
+  })
+
+  it('answers with a single description too', async () => {
+    FakePeerConnection.slowGathering = true
+    start('fan', false)
+    fire('webrtc:signal', {
+      roomCode: 'ROOM01',
+      from: 'a',
+      to: 'fan',
+      negotiationId: 'neg-1',
+      description: { type: 'offer', sdp: 'remote-offer' },
+    })
+    await flush()
+    const [pc] = pcsFor()
+    pc.gatherCandidate('cand-0')
+    pc.gatherCandidate('cand-1')
+    expect(sentSignals()).toEqual([])
+
+    pc.completeGathering()
+    await flush()
+    expect(sentSignals()).toEqual([
+      {
+        roomCode: 'ROOM01',
+        from: 'fan',
+        to: 'a',
+        negotiationId: 'neg-1',
+        description: { type: 'answer', sdp: 'answer-sdp+cand-0+cand-1' },
+      },
+    ])
+  })
+
+  it('stops waiting for candidates after the cap and sends what it has', async () => {
+    room = battleRoom(['a', 'fan'])
+    FakePeerConnection.slowGathering = true
+    start('a', true)
+    await flush(0)
+    const [pc] = pcsFor()
+    pc.gatherCandidate('cand-0')
+    // A state change that is not the end of the gathering changes nothing.
+    pc.onicegatheringstatechange?.()
+
+    await flush(ICE_GATHERING_CAP_MS - 1)
+    expect(sentSignals()).toEqual([])
+    await flush(1)
+    expect(sentSignals().map((s) => s.description?.sdp)).toEqual(['offer-sdp+cand-0'])
+  })
+
+  it('sends a candidate found after the description on its own', async () => {
+    room = battleRoom(['a', 'fan'])
+    FakePeerConnection.slowGathering = true
+    start('a', true)
+    await flush(ICE_GATHERING_CAP_MS)
+    const [pc] = pcsFor()
+    const [offer] = sentSignals()
+
+    pc.gatherCandidate('late')
+    pc.completeGathering()
+    await flush()
+    expect(sentSignals().slice(1)).toEqual([
+      { roomCode: 'ROOM01', from: 'a', to: 'fan', negotiationId: offer.negotiationId, candidate: { candidate: 'late' } },
+    ])
+  })
+
+  it('spaces the events instead of sending them at once', async () => {
+    start('a', true)
+    await flush(0)
+    expect(sentEvents()).toEqual(['webrtc:ready'])
+    await flush(SIGNAL_GAP_MS - 1)
+    expect(sentEvents()).toHaveLength(1)
+    await flush(1)
+    expect(sentEvents()).toHaveLength(2)
+    await flush(SIGNAL_GAP_MS)
+    expect(sentEvents()).toHaveLength(3)
+    await flush(SIGNAL_GAP_MS)
+    expect(sentEvents()).toHaveLength(4)
+  })
+})
+
+describe('createPeerSession: signaling delivery', () => {
+  beforeEach(() => {
+    room = battleRoom(['a', 'fan'])
+  })
+
+  /** Refuses the first `times` signals with `response`, then accepts. */
+  function refuseSignals(times: number, response: unknown) {
+    let left = times
+    fakeSocket.respond = (event) => {
+      if (event !== 'webrtc:signal' || left <= 0) return ACCEPTED
+      left -= 1
+      return response
+    }
+  }
+
+  it('sends a rate-limited description again after the retryAfterMs of the notice', async () => {
+    refuseSignals(1, RATE_LIMITED)
+    start('a', true)
+    await flush(SIGNAL_GAP_MS)
+    expect(sentSignals()).toHaveLength(1)
+
+    // The server acknowledges the dropped event first and then tells when to come back.
+    fire('rate:limited', { code: 'RATE_LIMITED', dropped: 1, retryAfterMs: 700 })
+    await flush(699)
+    expect(sentSignals()).toHaveLength(1)
+    await flush(1)
+    expect(sentSignals()).toHaveLength(2)
+    expect(sentSignals()[1]).toEqual(sentSignals()[0])
+
+    // Delivered: it is not sent a third time.
+    await flush(5000)
+    expect(sentSignals()).toHaveLength(2)
+  })
+
+  it('remembers the retryAfterMs of an earlier notice', async () => {
+    refuseSignals(1, RATE_LIMITED)
+    start('a', true)
+    fire('rate:limited', { code: 'RATE_LIMITED', dropped: 3, retryAfterMs: 400 })
+    await flush(SIGNAL_GAP_MS)
+    expect(sentSignals()).toHaveLength(1)
+    await flush(399)
+    expect(sentSignals()).toHaveLength(1)
+    await flush(1)
+    expect(sentSignals()).toHaveLength(2)
+  })
+
+  it('waits longer on every refusal when the server gives no usable delay', async () => {
+    refuseSignals(2, RATE_LIMITED)
+    start('a', true)
+    fire('rate:limited')
+    fire('rate:limited', { retryAfterMs: -5 })
+    fire('rate:limited', { retryAfterMs: 'soon' })
+    await flush(SIGNAL_GAP_MS)
+    expect(sentSignals()).toHaveLength(1)
+
+    await flush(RATE_LIMIT_MIN_DELAY_MS)
+    expect(sentSignals()).toHaveLength(2)
+    await flush(RATE_LIMIT_MIN_DELAY_MS * 2 - 1)
+    expect(sentSignals()).toHaveLength(2)
+    await flush(1)
+    expect(sentSignals()).toHaveLength(3)
+  })
+
+  it('gives up a description that keeps being rate limited, without flooding', async () => {
+    refuseSignals(Number.POSITIVE_INFINITY, RATE_LIMITED)
+    start('a', true)
+    await flush(60_000)
+    expect(sentSignals()).toHaveLength(1 + MAX_RATE_LIMIT_RETRIES)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('kept being rate limited'))
+  })
+
+  it('does not resend a signal refused for another reason', async () => {
+    refuseSignals(1, NOT_IN_ROOM)
+    start('a', true)
+    await flush(60_000)
+    expect(sentSignals()).toHaveLength(1)
+  })
+
+  it('announces again while the server refuses it, up to a limit', async () => {
+    fakeSocket.respond = (event) => (event === 'webrtc:ready' ? NOT_IN_ROOM : ACCEPTED)
+    start('a', true)
+    await flush(0)
+    expect(sentEvents()).toEqual(['webrtc:ready'])
+    await flush(REJECTED_RETRY_DELAY_MS)
+    expect(sentEvents()).toEqual(['webrtc:ready', 'webrtc:ready'])
+
+    await flush(60_000)
+    const events = sentEvents()
+    expect(events.filter((event) => event === 'webrtc:ready')).toHaveLength(1 + MAX_REJECTED_RETRIES)
+    // The queue moves on to the offer afterwards.
+    expect(events.at(-1)).toBe('webrtc:signal')
+  })
+
+  it('holds the signaling while the socket is down', async () => {
+    fakeSocket.connected = false
+    start('a', true)
+    await flush()
+    expect(fakeSocket.emit).not.toHaveBeenCalled()
+
+    fakeSocket.connected = true
+    fire('connect')
+    await flush()
+    expect(sentEvents()).toEqual(['webrtc:ready', 'webrtc:signal'])
+  })
+
+  it('moves on when an event is never acknowledged and ignores a late acknowledgement', async () => {
+    const acks: Ack[] = []
+    fakeSocket.emit.mockImplementationOnce((_event: string, _payload: unknown, ack?: Ack) => {
+      if (ack) acks.push(ack)
+    })
+    start('a', true)
+    await flush(SIGNAL_ACK_TIMEOUT_MS - 1)
+    expect(sentEvents()).toEqual(['webrtc:ready'])
+    await flush(1 + SIGNAL_GAP_MS)
+    expect(sentEvents()).toEqual(['webrtc:ready', 'webrtc:signal'])
+
+    acks[0](RATE_LIMITED)
+    await flush(60_000)
+    expect(sentEvents()).toEqual(['webrtc:ready', 'webrtc:signal'])
   })
 })
 
@@ -377,7 +646,7 @@ describe('createPeerSession: as the offerer', () => {
     description: { type: 'answer', sdp: 'remote-answer' },
   })
 
-  it('applies the answer, then the candidates that follow it', async () => {
+  it('applies the answer, then the candidates a peer still trickles', async () => {
     const { pc, negotiationId } = await offeringTo('fan')
     fire('webrtc:signal', answerSignal(negotiationId))
     await flush()
@@ -410,16 +679,6 @@ describe('createPeerSession: as the offerer', () => {
     fire('webrtc:signal', { roomCode: 'ROOM01', from: 'fan', to: 'a', negotiationId, candidate: { candidate: 'bad' } })
     await flush()
     expect(warn).toHaveBeenCalledWith('WebRTC signal could not be applied', expect.any(Error))
-  })
-
-  it('relays its ICE candidates with the negotiation id', async () => {
-    const { pc, negotiationId } = await offeringTo('fan')
-    fakeSocket.emit.mockClear()
-    pc.onicecandidate?.({ candidate: { toJSON: () => ({ candidate: 'local-1' }) } })
-    pc.onicecandidate?.({ candidate: null })
-    expect(sentSignals()).toEqual([
-      { roomCode: 'ROOM01', from: 'a', to: 'fan', negotiationId, candidate: { candidate: 'local-1' } },
-    ])
   })
 
   it('publishes the remote stream, building one from the track when none is given', async () => {
@@ -526,7 +785,10 @@ describe('createPeerSession: dispose', () => {
     session = null
 
     expect(pc.close).toHaveBeenCalledTimes(1)
-    expect(fakeSocket.off).toHaveBeenCalledTimes(3)
+    expect(fakeSocket.off.mock.calls.map(([event]) => event).sort()).toEqual(
+      fakeSocket.on.mock.calls.map(([event]) => event).sort(),
+    )
+    expect([...fakeSocket.handlers.values()].every((handlers) => handlers.size === 0)).toBe(true)
     expect(usePeerStore.getState().remoteStreams).toEqual({})
 
     // Late events are ignored.
@@ -539,6 +801,15 @@ describe('createPeerSession: dispose', () => {
     })
     await flush()
     expect(pcsFor()).toHaveLength(1)
+  })
+
+  it('sends nothing that was still queued when the session was disposed', async () => {
+    const current = start('a', true)
+    await flush(0)
+    current.dispose()
+    session = null
+    await flush(60_000)
+    expect(sentEvents()).toEqual(['webrtc:ready'])
   })
 
   it('discards an offer that resolves after the session was disposed', async () => {

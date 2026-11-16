@@ -90,9 +90,13 @@ spectators) watches it live. The stage shows one tile per dancer in a two-column
 - **Topology**: a full mesh of peer-to-peer connections. Dancers publish, spectators only receive, and
   spectators never connect to each other. Each dancer offers to each spectator; between any two dancers the
   one with the lexicographically smaller player id offers and a single connection carries video both ways.
-- **Signaling**: offers, answers, and ICE candidates travel over Socket.IO (`webrtc:ready`,
-  `webrtc:peer-ready`, `webrtc:signal`) through battle-service, which only validates room membership and
-  relays them. Media never passes through the server.
+- **Signaling**: offers and answers travel over Socket.IO (`webrtc:ready`, `webrtc:peer-ready`,
+  `webrtc:signal`) through battle-service, which only validates room membership and relays them. Media never
+  passes through the server. battle-service rate limits every socket (20 events per second, burst of 40) and
+  drops what goes over, so signaling is kept small: ICE candidates are not trickled, each side waits for the
+  gathering to finish (2 s at most) and sends one description with the candidates inside. Events leave one
+  at a time through a paced queue, and one the server dropped (`RATE_LIMITED`) is sent again after the
+  `retryAfterMs` of the `rate:limited` notice.
 - **ICE servers**: `stun:stun.l.google.com:19302` is always used. Peers behind strict or symmetric NATs
   (some corporate or mobile networks) cannot connect with STUN alone and need a TURN relay: set
   `VITE_TURN_URLS`, `VITE_TURN_USERNAME` and `VITE_TURN_CREDENTIAL` to add one. Malformed URLs and a relay
