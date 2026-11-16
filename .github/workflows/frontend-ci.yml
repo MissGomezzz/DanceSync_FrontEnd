@@ -61,5 +61,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
+          # The project has SonarQube Cloud's scanner autoconfig (beta) on, which ignores sonar-project.properties.
           args: >
             -Dsonar.qualitygate.wait=true
+            -Dsonar.scanner.autoconfig.enabled=false
