@@ -14,7 +14,13 @@ import { useKickedRedirect } from '../../rooms/hooks/useKickedRedirect'
 import { EndAnnouncement } from '../../results/components/EndAnnouncement'
 import { MatchResults } from '../../results/components/MatchResults'
 import { useScoreboardSync } from '../../scoreboard/hooks/useScoreboardSync'
-import { useRoom, useRoomError, useRoomJoinError, useRoomStore } from '../../rooms/store/roomStore'
+import {
+  ROOM_IN_BATTLE_NOTICE,
+  useRoom,
+  useRoomError,
+  useRoomJoinError,
+  useRoomStore,
+} from '../../rooms/store/roomStore'
 import { WordRaceOverlay } from '../../wordRace/components/WordRaceOverlay'
 import { useWordRaceSync } from '../../wordRace/hooks/useWordRaceSync'
 import { useWordRaceWins } from '../../wordRace/store/wordRaceStore'
@@ -88,7 +94,14 @@ export function BattleStage({ roomCode }: BattleStageProps) {
   const songStartAt = useServerTime(battle?.startsInMs, battle, battle?.startedAt ?? null)
 
   if (!inRoom && joinError) {
-    return <RoomUnavailableView roomCode={roomCode} reason={joinError} onBack={() => navigate('/home')} />
+    return (
+      <RoomUnavailableView
+        roomCode={roomCode}
+        reason={joinError}
+        codeHint={joinError !== ROOM_IN_BATTLE_NOTICE}
+        onBack={() => navigate('/home')}
+      />
+    )
   }
   const song = battle?.song ?? null
   const videoId = inRoom && room.status === 'battling' ? (song?.youtubeId ?? null) : null

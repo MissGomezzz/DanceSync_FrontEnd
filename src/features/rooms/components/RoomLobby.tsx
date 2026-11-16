@@ -8,6 +8,7 @@ import { SongSelectionPanel } from '../../songSelection/components/SongSelection
 import {
   MAX_PLAYERS,
   MIN_PLAYERS_TO_START,
+  ROOM_IN_BATTLE_NOTICE,
   useRoom,
   useRoomError,
   useRoomJoinError,
@@ -125,6 +126,7 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
       <RoomUnavailableView
         roomCode={roomCode}
         reason={joinError}
+        codeHint={joinError !== ROOM_IN_BATTLE_NOTICE}
         onBack={() => navigate('/home')}
         onRetry={() => setJoinAttempt((n) => n + 1)}
       />

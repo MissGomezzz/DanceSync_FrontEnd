@@ -2,6 +2,7 @@ import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { SocketDomainError } from '../../../shared/lib/socket'
 import type { Battle, Room } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useRoomStore } from '../../rooms/store/roomStore'
@@ -13,7 +14,13 @@ vi.mock('../../../shared/lib/socket', () => ({
   emitWithAck,
   connectSocket: vi.fn(),
   socket: { on: vi.fn(), off: vi.fn(), io: { on: vi.fn() } },
-  SocketDomainError: class extends Error {},
+  SocketDomainError: class extends Error {
+    readonly code: string
+    constructor(code: string, message: string) {
+      super(message)
+      this.code = code
+    }
+  },
 }))
 vi.mock('../../camera/hooks/useBattleVideo', () => ({
   useBattleVideo: () => ({ dancerVideos: [], needsCameraPrompt: false }),
@@ -150,6 +157,44 @@ describe('BattleStage song video errors', () => {
 
     expect(useRoomStore.getState().error).toBe('The song video could not be loaded. Check your connection.')
     expect(screen.queryByRole('note')).toBeNull()
+  })
+})
+
+describe('BattleStage for a player who cannot join', () => {
+  async function renderRejected(error: Error) {
+    emitWithAck.mockImplementation((event: string) =>
+      event === 'room:join' ? Promise.reject(error) : new Promise(() => {}),
+    )
+    render(
+      <MemoryRouter initialEntries={['/battle/ROOM01']}>
+        <Routes>
+          <Route path="/battle/:roomCode" element={<BattleStage roomCode="ROOM01" />} />
+          <Route path="/home" element={<p>Home page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    await act(async () => {})
+  }
+
+  it('tells a latecomer that the battle is already in progress', async () => {
+    await renderRejected(new SocketDomainError('ROOM_NOT_WAITING', 'Room ROOM01 is not accepting players'))
+
+    expect(screen.getByRole('heading', { name: 'Cannot join room ROOM01' })).toBeTruthy()
+    expect(
+      screen.getByText("This room's battle is already in progress. Wait for the rematch or join another room."),
+    ).toBeTruthy()
+    expect(screen.queryByText(/not accepting players/)).toBeNull()
+    expect(screen.queryByText(/Check the code/)).toBeNull()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Back to home' }))
+    expect(screen.getByText('Home page')).toBeTruthy()
+  })
+
+  it('keeps the server message and the "check the code" advice for any other rejection', async () => {
+    await renderRejected(new SocketDomainError('ROOM_NOT_FOUND', 'Room ROOM01 not found'))
+
+    expect(screen.getByText('Room ROOM01 not found')).toBeTruthy()
+    expect(screen.getByText(/Check the code with the room host/)).toBeTruthy()
   })
 })
 

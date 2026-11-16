@@ -2,6 +2,7 @@ import { act, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { SocketDomainError } from '../../../shared/lib/socket'
 import type { Room } from '../../../shared/types'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useRoomStore } from '../store/roomStore'
@@ -20,7 +21,13 @@ vi.mock('../../../shared/lib/socket', () => ({
     off: vi.fn(),
     io: { on: vi.fn() },
   },
-  SocketDomainError: class extends Error {},
+  SocketDomainError: class extends Error {
+    readonly code: string
+    constructor(code: string, message: string) {
+      super(message)
+      this.code = code
+    }
+  },
 }))
 
 const NOW = '2026-01-01T00:00:00.000Z'
@@ -77,11 +84,33 @@ describe('joining the room', () => {
 
     expect(await screen.findByText('Cannot join room ROOM01')).toBeTruthy()
     expect(screen.getByText('The server did not respond. Check your connection.')).toBeTruthy()
+    expect(screen.getByText(/Check the code with the room host/)).toBeTruthy()
 
     serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
     await user.click(screen.getByRole('button', { name: 'Try again' }))
     expect((await screen.findAllByText('Rival')).length).toBeGreaterThan(0)
     expect(screen.queryByText('Cannot join room ROOM01')).toBeNull()
+  })
+})
+
+describe('joining a room whose battle already started', () => {
+  it('explains it in plain words, without the raw rejection or the "check the code" advice', async () => {
+    serverAnswers({
+      'room:join': () =>
+        Promise.reject(new SocketDomainError('ROOM_NOT_WAITING', 'Room ROOM01 is not accepting players')),
+    })
+    renderLobby()
+
+    expect(
+      await screen.findByText(
+        "This room's battle is already in progress. Wait for the rematch or join another room.",
+      ),
+    ).toBeTruthy()
+    expect(screen.queryByText(/not accepting players/)).toBeNull()
+    // The code is right: the room exists, it is just busy.
+    expect(screen.queryByText(/Check the code/)).toBeNull()
+    // The latecomer can try again once the rematch takes the room back to the lobby.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy()
   })
 })
 
