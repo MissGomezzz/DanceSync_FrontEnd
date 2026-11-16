@@ -152,22 +152,26 @@ export function RoomLobby({ roomCode }: RoomLobbyProps) {
           : null
 
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 sm:gap-6 sm:p-6">
       <ConnectionBanner status={connection} />
-      {inRoom && (
-        <RoleSelector
-          myRole={me?.role}
-          pending={rolePending}
-          onSelectDancer={() => void handleSelectRole('dancer')}
-          onSelectSpectator={() => void handleSelectRole('spectator')}
-        />
-      )}
-      {inRoom && <ReadyButton ready={me?.ready === true} pending={readyPending} onToggle={() => void handleToggleReady()} />}
-      {inRoom && room.lastResult?.standings && room.lastResult.standings.length > 0 && (
-        <LastBattleCardView standings={room.lastResult.standings} winnerId={room.lastResult.winnerId} />
-      )}
-      {inRoom && <SongSelectionPanel room={room} />}
       <RoomLobbyView
+        controls={
+          inRoom ? (
+            <>
+              <RoleSelector
+                myRole={me?.role}
+                pending={rolePending}
+                onSelectDancer={() => void handleSelectRole('dancer')}
+                onSelectSpectator={() => void handleSelectRole('spectator')}
+              />
+              <ReadyButton ready={me?.ready === true} pending={readyPending} onToggle={() => void handleToggleReady()} />
+              {room.lastResult?.standings && room.lastResult.standings.length > 0 && (
+                <LastBattleCardView standings={room.lastResult.standings} winnerId={room.lastResult.winnerId} />
+              )}
+              <SongSelectionPanel room={room} />
+            </>
+          ) : null
+        }
         roomCode={roomCode}
         players={players}
         // room.dancers is only filled when the battle starts; in the lobby the

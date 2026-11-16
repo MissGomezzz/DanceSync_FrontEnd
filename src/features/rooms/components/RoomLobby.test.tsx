@@ -114,6 +114,61 @@ describe('joining a room whose battle already started', () => {
   })
 })
 
+describe('the lobby layout', () => {
+  it('lists every player once, under the role they chose', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    expect(screen.getAllByText('Rival')).toHaveLength(1)
+    expect(screen.getAllByText('Me')).toHaveLength(1)
+    expect(within(screen.getByRole('list', { name: 'Dancers' })).getByText('Rival')).toBeTruthy()
+    expect(within(screen.getByRole('list', { name: 'Choosing role' })).getByText('Me')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Dancers (1)' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Spectators (0)' })).toBeTruthy()
+    expect(screen.getByText('No spectators yet.')).toBeTruthy()
+
+    // Once everyone has a role, the "Choosing role" group goes away.
+    act(() =>
+      useRoomStore.getState().receiveRoom(
+        lobby({
+          players: [
+            { id: 'me', displayName: 'Me', role: 'spectator' },
+            { id: 'rival', displayName: 'Rival', role: 'dancer' },
+          ],
+        }),
+      ),
+    )
+    expect(screen.queryByRole('heading', { name: /Choosing role/ })).toBeNull()
+    expect(within(screen.getByRole('list', { name: 'Spectators' })).getByText('Me')).toBeTruthy()
+    expect(screen.getAllByText('Me')).toHaveLength(1)
+  })
+
+  it('puts the room title above the role and ready controls', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    const title = screen.getByRole('heading', { name: 'Room ROOM01' })
+    const follows = (element: HTMLElement) =>
+      Boolean(title.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(follows(screen.getByRole('group', { name: 'Your role' }))).toBe(true)
+    expect(follows(screen.getByRole('button', { name: "I'm ready" }))).toBe(true)
+    expect(follows(screen.getByRole('region', { name: 'Song' }))).toBe(true)
+  })
+
+  it('stacks the footer on phones, so the hint is not squeezed beside the buttons', async () => {
+    serverAnswers({ 'room:join': () => Promise.resolve(lobby()) })
+    renderLobby()
+    await screen.findByText('Rival')
+
+    const footer = screen.getByRole('button', { name: 'Leave room' }).closest('footer') as HTMLElement
+    expect(footer.className).toContain('flex-col')
+    expect(footer.className).toContain('sm:flex-row')
+    expect(within(footer).getByRole('status').textContent).toBe('At least 2 players must choose "Dance" to start.')
+  })
+})
+
 describe('leaving the room', () => {
   it('goes home even when the server never answers the leave', async () => {
     const user = userEvent.setup()

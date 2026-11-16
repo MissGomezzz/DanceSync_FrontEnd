@@ -46,7 +46,7 @@ export function SongPickerView({
   return (
     <section
       aria-label="Choose the song"
-      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface shadow-soft p-6"
+      className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4 shadow-soft sm:p-6"
     >
       <h2 className="text-lg font-semibold text-ink">{heading}</h2>
       {isChooser && seconds !== null && (

@@ -14,7 +14,7 @@ interface ReadyButtonProps {
  */
 export function ReadyButton({ ready, pending, onToggle }: ReadyButtonProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface shadow-soft p-6">
+    <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 shadow-soft sm:p-6">
       <p className="text-sm text-ink-muted">
         {ready
           ? 'You are ready. Everyone in the room can see it; press the button again to cancel.'
