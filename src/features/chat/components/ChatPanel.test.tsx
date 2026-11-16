@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ChatMessage } from '../../../shared/types'
@@ -60,6 +60,75 @@ describe('ChatPanelView', () => {
   it('disables sending while a message is on its way', () => {
     render(<ChatPanelView messages={[]} draft="hey" error={null} sending onDraftChange={noop} onSend={noop} />)
     expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+})
+
+describe('ChatPanelView auto-scroll', () => {
+  const noop = () => {}
+  const view = (messages: ChatMessage[], draft = '') => (
+    <ChatPanelView messages={messages} draft={draft} error={null} sending={false} onDraftChange={noop} onSend={noop} />
+  )
+  const first = [message('1', 'Ana', 'Hello')]
+  const second = [...first, message('2', 'Beto', 'Hi!')]
+  const third = [...second, message('3', 'Ana', 'Ready?')]
+
+  /** jsdom lays nothing out: give the list a visible height of 100 px and a content height. */
+  function setContentHeight(list: HTMLElement, scrollHeight: number) {
+    Object.defineProperty(list, 'clientHeight', { configurable: true, value: 100 })
+    Object.defineProperty(list, 'scrollHeight', { configurable: true, value: scrollHeight })
+  }
+
+  it('scrolls to the newest message when one arrives', () => {
+    const { rerender } = render(view(first))
+    const list = screen.getByRole('list')
+
+    setContentHeight(list, 600)
+    rerender(view(second))
+
+    expect(list.scrollTop).toBe(600)
+  })
+
+  it('leaves the view alone while the reader has scrolled up to read history', () => {
+    const { rerender } = render(view(first))
+    const list = screen.getByRole('list')
+    setContentHeight(list, 600)
+    rerender(view(second))
+
+    // The reader scrolls up: 400 px away from the end.
+    list.scrollTop = 100
+    fireEvent.scroll(list)
+    setContentHeight(list, 700)
+    rerender(view(third))
+
+    expect(list.scrollTop).toBe(100)
+  })
+
+  it('follows the newest message again once the reader is back near the end', () => {
+    const { rerender } = render(view(first))
+    const list = screen.getByRole('list')
+    setContentHeight(list, 600)
+    list.scrollTop = 100
+    fireEvent.scroll(list)
+    rerender(view(second))
+    expect(list.scrollTop).toBe(100)
+
+    // 20 px from the end still counts as following.
+    list.scrollTop = 480
+    fireEvent.scroll(list)
+    setContentHeight(list, 700)
+    rerender(view(third))
+
+    expect(list.scrollTop).toBe(700)
+  })
+
+  it('does not scroll when nothing new arrived (for example while typing a draft)', () => {
+    const { rerender } = render(view(second))
+    const list = screen.getByRole('list')
+    setContentHeight(list, 600)
+
+    rerender(view(second, 'typing...'))
+
+    expect(list.scrollTop).toBe(0)
   })
 })
 

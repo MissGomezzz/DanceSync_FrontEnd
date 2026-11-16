@@ -1,4 +1,5 @@
 import type { FormEvent } from 'react'
+import { useStickToBottom } from '../../../shared/hooks/useStickToBottom'
 import type { ChatMessage } from '../../../shared/types'
 import { Button } from '../../../shared/ui/atoms/Button'
 import { Input } from '../../../shared/ui/atoms/Input'
@@ -13,6 +14,9 @@ interface ChatPanelViewProps {
 }
 
 export function ChatPanelView({ messages, draft, error, sending, onDraftChange, onSend }: ChatPanelViewProps) {
+  // Follows the newest message, but leaves the view alone while the reader is up in the history.
+  const { ref: listRef, onScroll } = useStickToBottom<HTMLUListElement>(messages[messages.length - 1]?.id)
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     onSend()
@@ -24,10 +28,15 @@ export function ChatPanelView({ messages, draft, error, sending, onDraftChange, 
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-muted">Room chat</h2>
         <p className="text-xs text-ink-soft">Everyone in the room can chat.</p>
       </header>
-      <ul className="flex max-h-64 flex-1 flex-col gap-2 overflow-y-auto px-4 py-3 text-sm">
+      <ul
+        ref={listRef}
+        onScroll={onScroll}
+        // overscroll-contain: reaching the end of the chat must not start scrolling the page behind it.
+        className="flex max-h-64 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-4 py-3 text-sm"
+      >
         {messages.length === 0 && <li className="text-ink-soft">No messages yet.</li>}
         {messages.map((message) => (
-          <li key={message.id}>
+          <li key={message.id} className="break-words">
             <span className="font-semibold text-secondary-strong">{message.senderName}: </span>
             <span className="text-ink">{message.content}</span>
           </li>
@@ -35,7 +44,7 @@ export function ChatPanelView({ messages, draft, error, sending, onDraftChange, 
       </ul>
       {error && <p className="px-4 pb-2 text-xs text-rose-700">{error}</p>}
       <form onSubmit={handleSubmit} className="flex items-end gap-2 border-t border-line px-4 py-3">
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <Input
             id="chat-draft"
             aria-label="Chat message"
