@@ -25,6 +25,10 @@ const { fakeSocket } = vi.hoisted(() => {
 
 vi.mock('../../../shared/lib/socket', () => ({ connectSocket: () => fakeSocket }))
 
+const { fakeEnv } = vi.hoisted(() => ({ fakeEnv: { turnUrls: '', turnUsername: '', turnCredential: '' } }))
+
+vi.mock('../../../shared/lib/env', () => ({ env: fakeEnv }))
+
 /** Minimal stand-in for RTCPeerConnection: records calls and lets tests drive its events. */
 class FakePeerConnection {
   static instances: FakePeerConnection[] = []
@@ -135,6 +139,7 @@ beforeEach(() => {
   fakeSocket.on.mockClear()
   fakeSocket.off.mockClear()
   fakeSocket.emit.mockClear()
+  Object.assign(fakeEnv, { turnUrls: '', turnUsername: '', turnCredential: '' })
   usePeerStore.getState().reset()
   vi.stubGlobal('RTCPeerConnection', FakePeerConnection)
   vi.stubGlobal('MediaStream', FakeMediaStream)
@@ -211,6 +216,47 @@ describe('createPeerSession: start-up', () => {
     expect(createOffer).toHaveBeenCalled()
     expect(sentSignals()).toEqual([])
     expect(warn).toHaveBeenCalledWith('WebRTC offer failed', expect.any(Error))
+  })
+})
+
+describe('createPeerSession: ICE servers', () => {
+  const stun = { urls: 'stun:stun.l.google.com:19302' }
+  const turn = { turnUrls: 'turn:relay.example.com:3478', turnUsername: 'dancer', turnCredential: 'secret' }
+
+  beforeEach(() => {
+    room = battleRoom(['a', 'fan'])
+  })
+
+  it('uses only the default STUN server when no TURN relay is configured', async () => {
+    start('a', true)
+    await flush()
+    expect(pcsFor()[0].config.iceServers).toEqual([stun])
+  })
+
+  it('adds the TURN relay configured through the environment', async () => {
+    Object.assign(fakeEnv, turn)
+    start('a', true)
+    await flush()
+    expect(pcsFor()[0].config.iceServers).toEqual([
+      stun,
+      { urls: ['turn:relay.example.com:3478'], username: 'dancer', credential: 'secret' },
+    ])
+  })
+
+  it('falls back to STUN when the browser rejects the configured servers', async () => {
+    Object.assign(fakeEnv, turn)
+    class PickyPc extends FakePeerConnection {
+      constructor(config: RTCConfiguration) {
+        if ((config.iceServers?.length ?? 0) > 1) throw new SyntaxError('bad ICE server')
+        super(config)
+      }
+    }
+    vi.stubGlobal('RTCPeerConnection', PickyPc)
+    start('a', true)
+    await flush()
+    expect(pcsFor()[0].config.iceServers).toEqual([stun])
+    expect(sentSignals()).toHaveLength(1)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('ICE servers were rejected'), expect.any(SyntaxError))
   })
 })
 

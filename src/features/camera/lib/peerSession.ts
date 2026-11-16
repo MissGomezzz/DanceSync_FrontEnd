@@ -1,10 +1,9 @@
+import { env } from '../../../shared/lib/env'
 import { connectSocket } from '../../../shared/lib/socket'
 import type { Room } from '../../../shared/types'
 import { usePeerStore } from '../store/peerStore'
 import type { WebRtcPeerReady, WebRtcReady, WebRtcSignal } from '../types'
-
-/** STUN only for the MVP: peers behind symmetric NATs need a TURN relay to connect. */
-const ICE_SERVERS: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
+import { buildIceServers, DEFAULT_ICE_SERVERS } from './iceServers'
 
 export interface PeerSessionOptions {
   roomCode: string
@@ -44,6 +43,7 @@ const ignoreAck = () => {}
 export function createPeerSession(options: PeerSessionOptions): PeerSession {
   const { roomCode, myId, isDancer, getRoom, localStream } = options
   const socket = connectSocket()
+  const iceServers = buildIceServers(env)
   const peers = new Map<string, PeerEntry>()
   let disposed = false
 
@@ -93,9 +93,19 @@ export function createPeerSession(options: PeerSessionOptions): PeerSession {
     localStream.getVideoTracks().forEach((track) => pc.addTrack(track, localStream))
   }
 
+  /** A TURN value the browser rejects must not take the camera down: fall back to STUN. */
+  const openConnection = (): RTCPeerConnection => {
+    try {
+      return new RTCPeerConnection({ iceServers })
+    } catch (error) {
+      console.warn('The configured ICE servers were rejected; using the default STUN server', error)
+      return new RTCPeerConnection({ iceServers: DEFAULT_ICE_SERVERS })
+    }
+  }
+
   const createPeer = (otherId: string, negotiationId: string, isOfferer: boolean, isRetry: boolean): PeerEntry => {
     closePeer(otherId)
-    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const pc = openConnection()
     const entry: PeerEntry = {
       pc,
       negotiationId,
