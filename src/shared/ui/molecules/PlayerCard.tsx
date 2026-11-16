@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { Player } from '../../types'
+import type { Player, PlayerRole } from '../../types'
 import { Badge } from '../atoms/Badge'
 
 interface PlayerCardProps {
@@ -9,14 +9,32 @@ interface PlayerCardProps {
   actions?: ReactNode
 }
 
+const roleLabels: Record<PlayerRole, string> = {
+  dancer: 'Dancer',
+  spectator: 'Spectator',
+  undecided: 'Choosing role',
+}
+
+const roleTones: Record<PlayerRole, 'accent' | 'teal' | 'neutral'> = {
+  dancer: 'accent',
+  spectator: 'teal',
+  undecided: 'neutral',
+}
+
+/**
+ * The name keeps one line and truncates; when the badges and the actions do not
+ * fit beside it (a phone), they wrap under the name instead of overflowing.
+ */
 export function PlayerCard({ player, isHost = false, actions = null }: PlayerCardProps) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
-      <span className="font-medium text-ink">{player.displayName}</span>
-      <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-sm">
+      <span className="min-w-0 flex-1 basis-24 truncate font-medium text-ink" title={player.displayName}>
+        {player.displayName}
+      </span>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {isHost && <Badge tone="sun">Host</Badge>}
         <Badge tone={player.ready ? 'success' : 'neutral'}>{player.ready ? 'Ready' : 'Not ready'}</Badge>
-        <Badge tone={player.role === 'dancer' ? 'accent' : 'teal'}>{player.role}</Badge>
+        <Badge tone={roleTones[player.role]}>{roleLabels[player.role]}</Badge>
         {actions}
       </div>
     </div>
