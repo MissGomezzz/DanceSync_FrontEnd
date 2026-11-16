@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { HttpError } from '../../../shared/api/httpClient'
 import { useAuthStore } from '../../auth/store/authStore'
 import { useAdminAccessStore } from '../store/adminAccessStore'
@@ -65,11 +65,67 @@ describe('RequireAdmin', () => {
     expect(await screen.findByText('home page')).toBeTruthy()
   })
 
-  it('keeps waiting (and retries) when the backend cannot be reached', async () => {
-    useAuthStore.setState({ identity: { id: 'oid-admin', displayName: 'Admin' }, session: { kind: 'user' } })
-    api.session.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({ admin: true })
-    renderGuarded()
-    expect(await screen.findByText('admin console')).toBeTruthy()
-    expect(api.session).toHaveBeenCalledTimes(2)
+  describe('when the backend cannot be reached', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      useAuthStore.setState({ identity: { id: 'oid-admin', displayName: 'Admin' }, session: { kind: 'user' } })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    /** Lets pending promises settle and moves the clock forward by `ms`. */
+    const advance = (ms: number) =>
+      act(async () => {
+        await vi.advanceTimersByTimeAsync(ms)
+      })
+
+    it('keeps waiting and retries after a delay, never at once', async () => {
+      api.session.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValue({ admin: true })
+      renderGuarded()
+      await advance(0)
+
+      expect(screen.getByText('Could not reach the server. Retrying…')).toBeTruthy()
+      expect(api.session).toHaveBeenCalledTimes(1)
+      await advance(1_999)
+      expect(api.session).toHaveBeenCalledTimes(1)
+
+      await advance(1)
+      expect(api.session).toHaveBeenCalledTimes(2)
+      expect(screen.getByText('admin console')).toBeTruthy()
+    })
+
+    it('doubles the delay after each failure, up to 30 s', async () => {
+      api.session.mockRejectedValue(new TypeError('Failed to fetch'))
+      renderGuarded()
+      await advance(0)
+
+      // Retries at 2, 4, 8, 16, 30 and again 30 seconds after each failure.
+      const expectedCalls: Array<[number, number]> = [
+        [2_000, 2],
+        [4_000, 3],
+        [8_000, 4],
+        [16_000, 5],
+        [30_000, 6],
+        [30_000, 7],
+      ]
+      for (const [delay, calls] of expectedCalls) {
+        await advance(delay - 1)
+        expect(api.session).toHaveBeenCalledTimes(calls - 1)
+        await advance(1)
+        expect(api.session).toHaveBeenCalledTimes(calls)
+      }
+    })
+
+    it('stops retrying once the guard is gone', async () => {
+      api.session.mockRejectedValue(new TypeError('Failed to fetch'))
+      const { unmount } = renderGuarded()
+      await advance(0)
+      unmount()
+
+      await advance(60_000)
+      expect(api.session).toHaveBeenCalledTimes(1)
+    })
   })
 })
