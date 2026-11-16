@@ -39,7 +39,7 @@ function TopList({ title, entries, empty, onPick }: { title: string; entries: Co
                 {onPick ? (
                   <button
                     type="button"
-                    className="min-w-0 truncate text-left font-medium text-ink hover:text-primary-strong hover:underline"
+                    className="min-w-0 truncate rounded-sm text-left font-medium text-ink hover:text-primary-strong hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     onClick={() => onPick(entry.key)}
                     title={`Show the records of ${entry.key}`}
                   >
@@ -157,7 +157,7 @@ export function OverviewTab({ onShowRecords }: { onShowRecords: (filter: { user?
               type="button"
               aria-pressed={hours === value}
               onClick={() => setHours(value as number)}
-              className={`rounded-md px-3 py-1.5 text-sm font-semibold ${hours === value ? 'bg-primary text-white' : 'text-ink-muted hover:text-ink'}`}
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${hours === value ? 'bg-primary text-white' : 'text-ink-muted hover:text-ink'}`}
             >
               {label}
             </button>

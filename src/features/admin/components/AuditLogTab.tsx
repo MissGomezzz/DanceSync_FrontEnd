@@ -182,7 +182,7 @@ export function AuditLogTab({ initialFilters }: { initialFilters: AuditFilters }
               type="button"
               aria-pressed={form.outcomes.includes(outcome)}
               onClick={() => toggleOutcome(outcome)}
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${form.outcomes.includes(outcome) ? 'border-primary bg-primary-soft text-primary-strong' : 'border-line text-ink-muted hover:border-ink-soft'}`}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${form.outcomes.includes(outcome) ? 'border-primary bg-primary-soft text-primary-strong' : 'border-line text-ink-muted hover:border-ink-soft'}`}
             >
               {OUTCOME_LABELS[outcome]}
             </button>

@@ -119,7 +119,7 @@ export function HomePage() {
         {adminAccess === 'admin' && (
           <Link
             to="/admin"
-            className="rounded-lg bg-secondary-soft px-3 py-1.5 text-xs font-semibold text-secondary-strong hover:bg-secondary/20"
+            className="rounded-lg bg-secondary-soft px-3 py-1.5 text-xs font-semibold text-secondary-strong hover:bg-secondary/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             Admin console
           </Link>

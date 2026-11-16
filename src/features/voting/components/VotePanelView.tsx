@@ -51,7 +51,7 @@ export function VotePanelView({
               aria-pressed={selected}
               disabled={disabled}
               onClick={() => onVote(dancer.id)}
-              className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 ${
+              className={`max-w-full truncate rounded-full border px-4 py-2 text-sm font-semibold transition-colors pointer-coarse:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50 ${
                 selected
                   ? 'border-primary bg-primary text-white shadow-sm'
                   : 'border-line bg-surface text-ink hover:border-primary/40 hover:bg-primary-soft'
