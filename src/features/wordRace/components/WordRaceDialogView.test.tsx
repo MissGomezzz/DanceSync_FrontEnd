@@ -120,6 +120,28 @@ describe('WordRaceDialogView', () => {
     expect(fireEvent.keyDown(dialog, { key: 'Tab' })).toBe(false)
   })
 
+  it('keeps a long word in one piece on phones and the card clear of the on-screen keyboard', () => {
+    renderDialog({ round: round({ word: 'choreography' }) })
+
+    const word = screen.getByTestId('word-race-word')
+    // Smaller on phones, and only split when a line of its own is still too short.
+    expect(word.className).toContain('text-4xl')
+    expect(word.className).toContain('sm:text-7xl')
+    expect(word.className).toContain('break-words')
+    expect(word.className).not.toContain('break-all')
+
+    // Top-aligned below sm, where the keyboard covers the lower half of the screen.
+    const layer = screen.getByRole('dialog').parentElement as HTMLElement
+    expect(layer.className).toContain('items-start')
+    expect(layer.className).toContain('sm:items-center')
+    expect(layer.className).toContain('overflow-y-auto')
+  })
+
+  it('draws the placeholder in an opaque colour', () => {
+    renderDialog()
+    expect(screen.getByLabelText('Type the word').className).not.toMatch(/placeholder:text-[\w-]+\/\d+/)
+  })
+
   it('gives the focus back to what had it when the dialog closes', () => {
     const trigger = document.createElement('button')
     document.body.appendChild(trigger)

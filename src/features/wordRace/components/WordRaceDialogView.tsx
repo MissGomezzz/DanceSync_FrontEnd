@@ -78,7 +78,9 @@ export function WordRaceDialogView({
   const showResult = !round && result !== null
 
   return createPortal(
-    <div className="fixed inset-0 z-(--layer-overlay) flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in">
+    // Pinned to the top on phones: the on-screen keyboard takes the lower half of
+    // the screen, so a centred card would hide the input behind it.
+    <div className="fixed inset-0 z-(--layer-overlay) flex items-start justify-center overflow-y-auto bg-black/60 p-3 backdrop-blur-sm animate-fade-in sm:items-center sm:p-4">
       <div
         ref={dialogRef}
         role="dialog"
@@ -86,7 +88,7 @@ export function WordRaceDialogView({
         aria-labelledby={labelId}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className={`flex w-full max-w-2xl flex-col gap-6 rounded-3xl border-2 p-6 shadow-2xl outline-none sm:p-10 motion-safe:animate-overlay-in motion-reduce:animate-fade-in ${
+        className={`flex w-full max-w-2xl flex-col gap-4 rounded-3xl border-2 p-4 shadow-2xl outline-none sm:gap-6 sm:p-10 motion-safe:animate-overlay-in motion-reduce:animate-fade-in ${
           showResult ? resultTones[result.kind] : 'border-primary/30 bg-surface shadow-primary/25'
         }`}
       >
@@ -148,7 +150,7 @@ function RoundPanel({ round, labelId, typed, submitting, notice, onTypedChange, 
   }
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in">
+    <div className="flex flex-col gap-4 animate-fade-in sm:gap-6">
       <header className="flex items-center justify-between gap-4">
         <h2 id={labelId} className="text-sm font-semibold uppercase tracking-[0.2em] text-secondary-strong">
           Word {round.roundNumber} of {round.totalRounds}
@@ -160,7 +162,8 @@ function RoundPanel({ round, labelId, typed, submitting, notice, onTypedChange, 
 
       <p
         data-testid="word-race-word"
-        className="mx-auto w-fit max-w-full select-none break-all text-center font-mono text-6xl font-black tracking-wide text-gradient-brand sm:text-7xl lg:text-8xl"
+        // break-words only splits a word that cannot fit on a line of its own.
+        className="mx-auto w-fit max-w-full select-none break-words text-center font-mono text-4xl font-black tracking-wide text-gradient-brand sm:text-7xl lg:text-8xl"
       >
         {round.word}
       </p>
@@ -183,12 +186,12 @@ function RoundPanel({ round, labelId, typed, submitting, notice, onTypedChange, 
           autoCapitalize="off"
           spellCheck={false}
           placeholder={timeUp ? "Time's up" : 'Type it and press Enter'}
-          className="min-w-0 flex-1 rounded-xl border-2 border-line bg-surface px-4 py-3 text-center font-mono text-2xl text-ink placeholder:text-base placeholder:text-ink-soft/70 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-50 sm:text-left"
+          className="min-w-0 flex-1 rounded-xl border-2 border-line bg-surface px-4 py-3 text-center font-mono text-2xl text-ink placeholder:text-base placeholder:text-ink-soft focus:border-primary focus:ring-2 focus:ring-primary/25 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:text-left"
         />
         <button
           type="submit"
           disabled={!canType || typed.trim().length === 0}
-          className="rounded-xl bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm hover:bg-primary-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-xl bg-primary px-6 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? 'Checking...' : 'Send'}
         </button>
